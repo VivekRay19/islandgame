@@ -17,48 +17,50 @@ export class HaatScene extends Phaser.Scene {
     this.state = StateManager.getInstance();
     const { width, height } = this.cameras.main;
 
-    // Haat Pavilion Marketplace Background
+    // Soft pastel pink backdrop
     const bg = this.add.graphics();
-    bg.fillGradientStyle(0x1e1b4b, 0x1e1b4b, 0x0f172a, 0x0f172a, 1);
+    bg.fillGradientStyle(0xF2B5CE, 0xF2B5CE, 0xE5A0BC, 0xE5A0BC, 1);
     bg.fillRect(0, 0, width, height);
 
-    // Decorative Haat canopy arches
-    const canopy = this.add.rectangle(width / 2, 85, width - 40, 44, 0xd97706, 0.85)
-      .setStrokeStyle(1.5, 0xfde047);
-    this.add.text(width / 2, 85, '🏪 CENTRAL CULTURAL HAAT • INTER-ISLAND TRADING & DEVELOPMENT', {
-      fontFamily: 'Cinzel, serif',
-      fontSize: '15px',
+    // Header Pill
+    const headerPill = this.add.rectangle(width / 2, 80, 560, 36, 0xFFFFFF, 0.9)
+      .setStrokeStyle(1.5, 0xE5A0BC);
+    this.add.text(width / 2, 80, '🏪 CENTRAL CULTURAL HAAT • INTER-ISLAND COMMERCE', {
+      fontFamily: 'Cinzel, Georgia, serif',
+      fontSize: '13px',
       fontStyle: 'bold',
-      color: '#ffffff'
+      color: '#332924',
+      letterSpacing: 1.5
     }).setOrigin(0.5);
 
-    // Initialize HUD
+    // Minimal HUD
     this.hud = new HUD(this);
 
     // Feedback status banner
-    this.feedbackText = this.add.text(width / 2, 125, `Trades Remaining this round: ${this.state.tradeSystem.getRemainingTrades()} / 2`, {
+    this.feedbackText = this.add.text(width / 2, 115, `Trades remaining this round: ${this.state.tradeSystem.getRemainingTrades()} / 2`, {
       fontFamily: 'Plus Jakarta Sans',
-      fontSize: '13px',
+      fontSize: '12px',
       fontStyle: 'bold',
-      color: '#38bdf8'
+      color: '#ffffff'
     }).setOrigin(0.5);
 
     // Left Column: Traders Stall
-    this.renderTraderStalls(width, height);
+    this.renderTraderStalls(width);
 
     // Right Column: Development Tasks Board
-    this.renderTaskBoard(width, height);
+    this.renderTaskBoard(width);
 
     // Bottom Return Button
-    const returnBtn = this.add.rectangle(width / 2, height - 40, 240, 44, 0x0284c7)
-      .setStrokeStyle(1.5, 0x38bdf8)
+    const returnBtn = this.add.rectangle(width / 2, height - 36, 220, 38, 0xB86D4F)
+      .setStrokeStyle(1.5, 0xFFFFFF)
       .setInteractive({ useHandCursor: true });
 
-    const returnTxt = this.add.text(width / 2, height - 40, '← RETURN TO ISLAND', {
-      fontFamily: 'Cinzel, serif',
-      fontSize: '15px',
+    this.add.text(width / 2, height - 36, '← RETURN TO ISLAND', {
+      fontFamily: 'Cinzel, Georgia, serif',
+      fontSize: '13px',
       fontStyle: 'bold',
-      color: '#ffffff'
+      color: '#ffffff',
+      letterSpacing: 1.5
     }).setOrigin(0.5);
 
     returnBtn.on('pointerdown', () => {
@@ -67,52 +69,49 @@ export class HaatScene extends Phaser.Scene {
     });
   }
 
-  private renderTraderStalls(width: number, height: number): void {
+  private renderTraderStalls(width: number): void {
     const traders = this.state.tradeSystem.getTraders();
-    const startX = width / 4 - 20;
-    const startY = 160;
+    const startX = width / 4 - 15;
+    const startY = 150;
 
-    this.add.text(startX, startY - 15, '🤝 VISITING ISLAND TRADERS', {
-      fontFamily: 'Cinzel',
-      fontSize: '14px',
+    this.add.text(startX, startY - 12, '🤝 VISITING ISLAND TRADERS', {
+      fontFamily: 'Cinzel, Georgia',
+      fontSize: '12px',
       fontStyle: 'bold',
-      color: '#fbbf24'
+      color: '#ffffff',
+      letterSpacing: 1.5
     }).setOrigin(0.5);
 
     traders.forEach((trader, idx) => {
-      const y = startY + 20 + idx * 80;
+      const y = startY + 18 + idx * 76;
       const offeredDef = RESOURCES[trader.offeredResource];
       const requestedDef = RESOURCES[trader.requestedResource];
 
-      const stallCard = this.add.rectangle(startX, y, width / 2 - 40, 68, 0x0f172a, 0.9)
-        .setStrokeStyle(1, 0x334155);
+      this.add.rectangle(startX, y, width / 2 - 40, 64, 0xFFFFFF, 0.92)
+        .setStrokeStyle(1, 0xE5A0BC);
 
-      // Trader Avatar & Name
-      this.add.text(startX - 180, y - 20, `${trader.avatarIcon} ${trader.name} (${trader.islandName})`, {
+      this.add.text(startX - 170, y - 18, `${trader.avatarIcon} ${trader.name} (${trader.islandName})`, {
         fontFamily: 'Plus Jakarta Sans',
         fontSize: '12px',
         fontStyle: 'bold',
-        color: '#f8fafc'
+        color: '#332924'
       });
 
-      // Trade offer string
-      this.add.text(startX - 180, y + 5, `Offers: ${trader.offeredQuantity}x ${offeredDef.symbol} ${offeredDef.name}  ➜  Needs: ${trader.requestedQuantity}x ${requestedDef.symbol} ${requestedDef.name}`, {
+      this.add.text(startX - 170, y + 5, `Offers: ${trader.offeredQuantity}x ${offeredDef.symbol} ${offeredDef.name}  ➜  Needs: ${trader.requestedQuantity}x ${requestedDef.symbol} ${requestedDef.name}`, {
         fontFamily: 'Plus Jakarta Sans',
-        fontSize: '11px',
-        color: '#94a3b8'
+        fontSize: '10.5px',
+        color: '#64748B'
       });
 
-      // Trade Button
       const canAfford = this.state.resourceSystem.getCount(trader.requestedResource) >= trader.requestedQuantity;
       const canTrade = this.state.tradeSystem.canTrade();
 
-      const btn = this.add.rectangle(startX + 150, y, 70, 34, (canAfford && canTrade) ? 0x15803d : 0x334155)
-        .setStrokeStyle(1, (canAfford && canTrade) ? 0x4ade80 : 0x64748b)
+      const btn = this.add.rectangle(startX + 150, y, 66, 30, (canAfford && canTrade) ? 0x546B43 : 0xCBD5E1)
         .setInteractive({ useHandCursor: canAfford && canTrade });
 
-      const btnText = this.add.text(startX + 150, y, 'Trade', {
+      this.add.text(startX + 150, y, 'Trade', {
         fontFamily: 'Plus Jakarta Sans',
-        fontSize: '12px',
+        fontSize: '11px',
         fontStyle: 'bold',
         color: '#ffffff'
       }).setOrigin(0.5);
@@ -122,11 +121,9 @@ export class HaatScene extends Phaser.Scene {
         if (result.success) {
           this.state.soundSystem.playTradeCompleted();
           this.feedbackText.setText(`✅ ${result.message}`);
-          this.feedbackText.setColor('#4ade80');
         } else {
           this.state.soundSystem.playAlarm();
           this.feedbackText.setText(`⚠️ ${result.message}`);
-          this.feedbackText.setColor('#f87171');
         }
         this.hud.refresh();
         this.scene.restart();
@@ -134,65 +131,62 @@ export class HaatScene extends Phaser.Scene {
     });
   }
 
-  private renderTaskBoard(width: number, height: number): void {
+  private renderTaskBoard(width: number): void {
     const tasks = this.state.scoringSystem.getAvailableTasks();
-    const startX = width * 0.75 + 10;
-    const startY = 160;
+    const startX = width * 0.75 + 15;
+    const startY = 150;
 
     const level = this.state.scoringSystem.getLevel();
-    this.add.text(startX, startY - 15, `📋 LEVEL ${level} DEVELOPMENT TASKS`, {
-      fontFamily: 'Cinzel',
-      fontSize: '14px',
+    this.add.text(startX, startY - 12, `📋 LEVEL ${level} DEVELOPMENT TASKS`, {
+      fontFamily: 'Cinzel, Georgia',
+      fontSize: '12px',
       fontStyle: 'bold',
-      color: '#fbbf24'
+      color: '#ffffff',
+      letterSpacing: 1.5
     }).setOrigin(0.5);
 
     if (this.state.scoringSystem.hasCompletedTaskThisRound()) {
-      const doneBox = this.add.rectangle(startX, startY + 80, width / 2 - 40, 100, 0x064e3b, 0.8)
-        .setStrokeStyle(1.5, 0x34d399);
-      this.add.text(startX, startY + 80, '✅ Development Task completed for this round!\nEarned task development points.\nAdvance to next round from the Island map.', {
+      this.add.rectangle(startX, startY + 80, width / 2 - 40, 90, 0xFFFFFF, 0.92)
+        .setStrokeStyle(1.5, 0x546B43);
+      this.add.text(startX, startY + 80, '✅ Development Task completed for this round!\nReturn to the Island to advance rounds.', {
         fontFamily: 'Plus Jakarta Sans',
-        fontSize: '13px',
+        fontSize: '12px',
         align: 'center',
-        color: '#a7f3d0'
+        color: '#546B43'
       }).setOrigin(0.5);
       return;
     }
 
     tasks.slice(0, 3).forEach((task: DevelopmentTask, idx) => {
-      const y = startY + 20 + idx * 80;
+      const y = startY + 18 + idx * 76;
       const canAfford = this.state.resourceSystem.canAfford(task.cost);
 
-      const taskCard = this.add.rectangle(startX, y, width / 2 - 40, 68, 0x0f172a, 0.9)
-        .setStrokeStyle(1, canAfford ? 0xf59e0b : 0x334155);
+      this.add.rectangle(startX, y, width / 2 - 40, 64, 0xFFFFFF, 0.92)
+        .setStrokeStyle(1, canAfford ? 0xB86D4F : 0xE5A0BC);
 
-      // Task Name & Points
-      this.add.text(startX - 180, y - 20, `${task.symbol} ${task.name} (+${task.points} pts)`, {
+      this.add.text(startX - 170, y - 18, `${task.symbol} ${task.name} (+${task.points} pts)`, {
         fontFamily: 'Plus Jakarta Sans',
         fontSize: '12px',
         fontStyle: 'bold',
-        color: '#fbbf24'
+        color: '#332924'
       });
 
-      // Cost Breakdown
       const costStr = Object.entries(task.cost)
         .map(([res, amt]) => `${amt}x ${RESOURCES[res as ResourceId]?.symbol || ''} ${RESOURCES[res as ResourceId]?.name || res}`)
         .join(', ');
 
-      this.add.text(startX - 180, y + 5, `Cost: ${costStr}`, {
+      this.add.text(startX - 170, y + 5, `Cost: ${costStr}`, {
         fontFamily: 'Plus Jakarta Sans',
-        fontSize: '11px',
-        color: '#cbd5e1'
+        fontSize: '10.5px',
+        color: '#64748B'
       });
 
-      // Build Task Button
-      const btn = this.add.rectangle(startX + 150, y, 70, 34, canAfford ? 0xd97706 : 0x334155)
-        .setStrokeStyle(1, canAfford ? 0xfde047 : 0x64748b)
+      const btn = this.add.rectangle(startX + 150, y, 66, 30, canAfford ? 0xB86D4F : 0xCBD5E1)
         .setInteractive({ useHandCursor: canAfford });
 
       this.add.text(startX + 150, y, 'Build', {
         fontFamily: 'Plus Jakarta Sans',
-        fontSize: '12px',
+        fontSize: '11px',
         fontStyle: 'bold',
         color: '#ffffff'
       }).setOrigin(0.5);
@@ -202,11 +196,9 @@ export class HaatScene extends Phaser.Scene {
         if (res.success) {
           this.state.soundSystem.playSuccessFanfare();
           this.feedbackText.setText(`✨ ${res.message}`);
-          this.feedbackText.setColor('#4ade80');
         } else {
           this.state.soundSystem.playAlarm();
           this.feedbackText.setText(`⚠️ ${res.message}`);
-          this.feedbackText.setColor('#f87171');
         }
         this.hud.refresh();
         this.scene.restart();

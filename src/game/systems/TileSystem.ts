@@ -1,15 +1,25 @@
 import { TileDefinition, TILE_DEFINITIONS, EdgeType } from '../data/tiles';
 import { PlacedTileData } from './SaveSystem';
 
-export interface PlacedTileInstance {
+export interface PlacedHexTileInstance {
   id: string;
-  gx: number;
-  gy: number;
+  q: number; // Axial column
+  r: number; // Axial row
   tileDef: TileDefinition;
-  rotation: number; // 0, 90, 180, 270 degrees
+  rotation: number; // 0, 60, 120, 180, 240, 300 degrees
   isDamaged: boolean;
   placedAtRound: number;
 }
+
+// 6 Axial neighbor offsets (East, NE, NW, West, SW, SE)
+export const HEX_DIRECTIONS = [
+  { dq: +1, dr: 0 },  // 0: East
+  { dq: +1, dr: -1 }, // 1: North-East
+  { dq: 0, dr: -1 },  // 2: North-West
+  { dq: -1, dr: 0 },  // 3: West
+  { dq: -1, dr: +1 }, // 4: South-West
+  { dq: 0, dr: +1 }   // 5: South-East
+];
 
 export interface AdjacencyMatchResult {
   matchingEdges: number;
@@ -18,24 +28,23 @@ export interface AdjacencyMatchResult {
 }
 
 export class TileSystem {
-  private grid: Map<string, PlacedTileInstance> = new Map();
+  private grid: Map<string, PlacedHexTileInstance> = new Map();
   private tileDeck: TileDefinition[] = [];
   private currentTileToPlace: TileDefinition | null = null;
-  private currentRotation: number = 0; // 0, 90, 180, 270
+  private currentRotation: number = 0; // 0 to 300 in steps of 60
 
   constructor() {
     this.resetDeck();
   }
 
-  private getKey(gx: number, gy: number): string {
-    return `${gx},${gy}`;
+  private getKey(q: number, r: number): string {
+    return `${q},${r}`;
   }
 
   public resetDeck(): void {
     const allDefs = Object.values(TILE_DEFINITIONS);
-    // Shuffle pool with varied cultural tiles
     this.tileDeck = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 7; i++) {
       for (const def of allDefs) {
         this.tileDeck.push(def);
       }
@@ -69,72 +78,91 @@ export class TileSystem {
   }
 
   public rotateCurrentTile(): number {
-    this.currentRotation = (this.currentRotation + 90) % 360;
+    this.currentRotation = (this.currentRotation + 60) % 360;
     return this.currentRotation;
   }
 
   public getDeckCount(): number {
-    return this.tileDeck.length;
+    return this.tileDeck.length + (this.currentTileToPlace ? 1 : 0);
   }
 
-  public getTileAt(gx: number, gy: number): PlacedTileInstance | undefined {
-    return this.grid.get(this.getKey(gx, gy));
+  public getTileAt(q: number, r: number): PlacedHexTileInstance | undefined {
+    return this.grid.get(this.getKey(q, r));
   }
 
-  public getAllPlacedTiles(): PlacedTileInstance[] {
+  public getAllPlacedTiles(): PlacedHexTileInstance[] {
     return Array.from(this.grid.values());
   }
 
-  public getBuildingTiles(): PlacedTileInstance[] {
+  public getBuildingTiles(): PlacedHexTileInstance[] {
     return this.getAllPlacedTiles().filter(t => !!t.tileDef.buildingType);
   }
 
-  public getRotatedEdges(tileDef: TileDefinition, rotation: number): [EdgeType, EdgeType, EdgeType, EdgeType] {
-    const shift = Math.floor(rotation / 90) % 4;
-    const base = tileDef.baseEdges;
-    // Rotation shifts clockwise: [Top, Right, Bottom, Left]
-    // 90 deg -> old Left becomes new Top, old Top becomes new Right...
-    const rotated: EdgeType[] = [];
-    for (let i = 0; i < 4; i++) {
-      const originalIndex = (i - shift + 4) % 4;
-      rotated.push(base[originalIndex]);
+  // Get all empty coordinates adjacent to placed tiles (the white placement slots)
+  public getAvailablePlacementSlots(): { q: number; r: number }[] {
+    const slots = new Map<string, { q: number; r: number }>();
+    if (this.grid.size === 0) {
+      return [{ q: 0, r: 0 }];
     }
-    return [rotated[0], rotated[1], rotated[2], rotated[3]];
+
+    for (const tile of this.grid.values()) {
+      for (const dir of HEX_DIRECTIONS) {
+        const nq = tile.q + dir.dq;
+        const nr = tile.r + dir.dr;
+        const key = this.getKey(nq, nr);
+        if (!this.grid.has(key)) {
+          slots.set(key, { q: nq, r: nr });
+        }
+      }
+    }
+
+    return Array.from(slots.values());
   }
 
-  public isValidPlacement(gx: number, gy: number): boolean {
-    // Check if cell is already occupied
-    if (this.grid.has(this.getKey(gx, gy))) {
+  public isValidPlacement(q: number, r: number): boolean {
+    if (this.grid.has(this.getKey(q, r))) {
       return false;
     }
-
-    // If grid is empty, allow placement at center (0,0)
     if (this.grid.size === 0) {
-      return gx === 0 && gy === 0;
+      return q === 0 && r === 0;
     }
-
-    // Must be adjacent to at least one placed tile
-    const neighbors = this.getNeighbors(gx, gy);
+    const neighbors = this.getNeighbors(q, r);
     return neighbors.some(n => n !== undefined);
   }
 
-  public getNeighbors(gx: number, gy: number): (PlacedTileInstance | undefined)[] {
-    return [
-      this.getTileAt(gx, gy - 1), // North (0)
-      this.getTileAt(gx + 1, gy), // East (1)
-      this.getTileAt(gx, gy + 1), // South (2)
-      this.getTileAt(gx - 1, gy)  // West (3)
-    ];
+  public getNeighbors(q: number, r: number): (PlacedHexTileInstance | undefined)[] {
+    return HEX_DIRECTIONS.map(dir => this.getTileAt(q + dir.dq, r + dir.dr));
   }
 
-  public evaluateEdgeMatching(gx: number, gy: number, tileDef: TileDefinition, rotation: number): AdjacencyMatchResult {
+  public getRotatedEdges(tileDef: TileDefinition, rotation: number): EdgeType[] {
+    const shift = Math.floor(rotation / 60) % 6;
+    const base4 = tileDef.baseEdges;
+    // Map 4-edge definition to 6 hex edges [E, NE, NW, W, SW, SE]
+    const base6: EdgeType[] = [
+      base4[1], // East
+      base4[0], // North-East
+      base4[0], // North-West
+      base4[3], // West
+      base4[2], // South-West
+      base4[2]  // South-East
+    ];
+
+    const rotated: EdgeType[] = [];
+    for (let i = 0; i < 6; i++) {
+      const origIdx = (i - shift + 6) % 6;
+      rotated.push(base6[origIdx]);
+    }
+    return rotated;
+  }
+
+  public evaluateEdgeMatching(q: number, r: number, tileDef: TileDefinition, rotation: number): AdjacencyMatchResult {
     const rotatedEdges = this.getRotatedEdges(tileDef, rotation);
-    const neighbors = this.getNeighbors(gx, gy);
+    const neighbors = this.getNeighbors(q, r);
     let matchingEdges = 0;
     let totalNeighbors = 0;
 
-    // Opposite edge index mapping: North(0) <-> South(2), East(1) <-> West(3)
-    const oppositeMap = [2, 3, 0, 1];
+    // Opposite edge in hex directions: 0<->3, 1<->4, 2<->5
+    const oppositeMap = [3, 4, 5, 0, 1, 2];
 
     neighbors.forEach((neighbor, dir) => {
       if (neighbor) {
@@ -148,32 +176,32 @@ export class TileSystem {
       }
     });
 
-    const scoreBonus = matchingEdges * 3 + (matchingEdges === totalNeighbors && totalNeighbors > 1 ? 5 : 0);
+    const scoreBonus = matchingEdges * 15 + (matchingEdges === totalNeighbors && totalNeighbors >= 2 ? 25 : 0);
     return { matchingEdges, totalNeighbors, scoreBonus };
   }
 
-  public placeTile(gx: number, gy: number, tileDef: TileDefinition, rotation: number, round: number = 1): PlacedTileInstance | null {
-    if (!this.isValidPlacement(gx, gy)) {
+  public placeTile(q: number, r: number, tileDef: TileDefinition, rotation: number, round: number = 1): PlacedHexTileInstance | null {
+    if (!this.isValidPlacement(q, r)) {
       return null;
     }
 
-    const instance: PlacedTileInstance = {
-      id: `tile_${gx}_${gy}_${Date.now()}`,
-      gx,
-      gy,
+    const instance: PlacedHexTileInstance = {
+      id: `hex_${q}_${r}_${Date.now()}`,
+      q,
+      r,
       tileDef,
       rotation,
       isDamaged: false,
       placedAtRound: round
     };
 
-    this.grid.set(this.getKey(gx, gy), instance);
+    this.grid.set(this.getKey(q, r), instance);
     this.drawNextTile();
     return instance;
   }
 
-  public setTileDamaged(gx: number, gy: number, isDamaged: boolean): boolean {
-    const tile = this.getTileAt(gx, gy);
+  public setTileDamaged(q: number, r: number, isDamaged: boolean): boolean {
+    const tile = this.getTileAt(q, r);
     if (tile) {
       tile.isDamaged = isDamaged;
       return true;
@@ -183,37 +211,41 @@ export class TileSystem {
 
   public initializeDefaultIsland(): void {
     this.grid.clear();
-    // Create picturesque starting island layout
-    const initialCenter = TILE_DEFINITIONS['tile_haat_market'];
+    // Recreate picturesque starting cluster resembling reference composition
+    const centerMarket = TILE_DEFINITIONS['tile_haat_market'];
     const farm = TILE_DEFINITIONS['tile_farm'];
     const craft = TILE_DEFINITIONS['tile_textile_workshop'];
-    const water = TILE_DEFINITIONS['tile_river_bend'];
     const forest = TILE_DEFINITIONS['tile_sacred_forest'];
+    const water = TILE_DEFINITIONS['tile_river_bend'];
+    const shrine = TILE_DEFINITIONS['tile_sacred_shrine'];
+    const civic = TILE_DEFINITIONS['tile_community_house'];
 
-    this.placeTileDirect(0, 0, initialCenter, 0);
-    this.placeTileDirect(0, -1, farm, 0);
+    this.placeTileDirect(0, 0, centerMarket, 0);
     this.placeTileDirect(1, 0, craft, 0);
-    this.placeTileDirect(-1, 0, water, 90);
-    this.placeTileDirect(0, 1, forest, 0);
+    this.placeTileDirect(0, -1, farm, 60);
+    this.placeTileDirect(-1, 0, water, 120);
+    this.placeTileDirect(-1, 1, forest, 0);
+    this.placeTileDirect(0, 1, civic, 180);
+    this.placeTileDirect(1, -1, shrine, 0);
   }
 
-  private placeTileDirect(gx: number, gy: number, tileDef: TileDefinition, rotation: number): void {
-    const instance: PlacedTileInstance = {
-      id: `tile_${gx}_${gy}_start`,
-      gx,
-      gy,
+  private placeTileDirect(q: number, r: number, tileDef: TileDefinition, rotation: number): void {
+    const instance: PlacedHexTileInstance = {
+      id: `hex_${q}_${r}_start`,
+      q,
+      r,
       tileDef,
       rotation,
       isDamaged: false,
       placedAtRound: 1
     };
-    this.grid.set(this.getKey(gx, gy), instance);
+    this.grid.set(this.getKey(q, r), instance);
   }
 
   public exportSaveData(): PlacedTileData[] {
     return Array.from(this.grid.values()).map(t => ({
-      q: t.gx,
-      r: t.gy,
+      q: t.q,
+      r: t.r,
       tileDefId: t.tileDef.id,
       rotation: t.rotation,
       isDamaged: t.isDamaged
@@ -225,9 +257,9 @@ export class TileSystem {
     for (const item of data) {
       const def = TILE_DEFINITIONS[item.tileDefId] || TILE_DEFINITIONS['tile_farm'];
       this.grid.set(this.getKey(item.q, item.r), {
-        id: `tile_${item.q}_${item.r}_loaded`,
-        gx: item.q,
-        gy: item.r,
+        id: `hex_${item.q}_${item.r}_loaded`,
+        q: item.q,
+        r: item.r,
         tileDef: def,
         rotation: item.rotation,
         isDamaged: !!item.isDamaged,

@@ -1,10 +1,10 @@
 import { CULTURAL_CONNECTIONS, CulturalConnectionRecipe } from '../data/culturalElements';
-import { TileSystem, PlacedTileInstance } from './TileSystem';
+import { TileSystem, PlacedHexTileInstance } from './TileSystem';
 
 export interface ActiveSynergyInstance {
   recipe: CulturalConnectionRecipe;
-  tileA: PlacedTileInstance;
-  tileB: PlacedTileInstance;
+  tileA: PlacedHexTileInstance;
+  tileB: PlacedHexTileInstance;
 }
 
 export class CulturalSystem {
@@ -19,15 +19,14 @@ export class CulturalSystem {
     for (const tile of tiles) {
       if (!tile.tileDef.buildingType) continue;
 
-      const neighbors = tileSystem.getNeighbors(tile.gx, tile.gy);
+      const neighbors = tileSystem.getNeighbors(tile.q, tile.r);
       for (const neighbor of neighbors) {
         if (!neighbor || !neighbor.tileDef.buildingType) continue;
 
-        // Prevent duplicate pairing (A-B vs B-A)
+        // Prevent duplicate pairing
         const pairKey = [tile.id, neighbor.id].sort().join(':::');
         if (pairedKeys.has(pairKey)) continue;
 
-        // Check if this pair matches any cultural connection recipe
         const typeA = tile.tileDef.buildingType;
         const typeB = neighbor.tileDef.buildingType;
 
@@ -82,19 +81,19 @@ export class CulturalSystem {
     const synergyCount = this.activeSynergies.length;
 
     if (synergyCount >= 4) {
-      return '✨ Grand Sovereign Cultural Archipelago';
+      return 'Grand Cultural Archipelago';
     } else if (dominantCategory === 'Craft') {
-      return '🧵 Master Artisan & Handloom Isle';
+      return 'Master Handloom Isle';
     } else if (dominantCategory === 'Agriculture') {
-      return '🌾 Bountiful Agrarian Haven';
+      return 'Bountiful Agrarian Haven';
     } else if (dominantCategory === 'Trade') {
-      return '🏪 Vibrant Central Haat Crossroads';
+      return 'Central Haat Crossroads';
     } else if (dominantCategory === 'Spiritual') {
-      return '🪔 Sacred Harmony & Melodic Realm';
+      return 'Sacred Melodic Sanctuary';
     } else if (dominantCategory === 'Civic') {
-      return '🏛️ United Heritage Community';
+      return 'United Heritage Community';
     } else {
-      return '🌿 Flourishing Serene Island';
+      return 'Peaceful Living Island';
     }
   }
 }

@@ -6,20 +6,23 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    // Show loading text
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
+
+    // Soft pastel pink loading screen
+    this.cameras.main.setBackgroundColor('#E8A8C2');
     
-    const loadingText = this.add.text(width / 2, height / 2, 'Weaving Cultural Islands...', {
-      fontFamily: 'Cinzel, serif',
-      fontSize: '24px',
-      color: '#fbbf24'
+    const loadingText = this.add.text(width / 2, height / 2, 'ISLAND HAAT', {
+      fontFamily: 'Cinzel, Georgia, serif',
+      fontSize: '22px',
+      color: '#ffffff',
+      letterSpacing: 4
     }).setOrigin(0.5);
 
     this.tweens.add({
       targets: loadingText,
-      alpha: 0.3,
-      duration: 600,
+      alpha: 0.4,
+      duration: 500,
       yoyo: true,
       repeat: -1
     });
@@ -29,31 +32,459 @@ export class BootScene extends Phaser.Scene {
     this.generateProceduralTextures();
     this.createAnimations();
 
-    // Proceed to MainMenuScene
-    this.time.delayedCall(400, () => {
+    this.time.delayedCall(300, () => {
       this.scene.start('MainMenuScene');
     });
   }
 
   private generateProceduralTextures(): void {
-    const textures = this.textures;
+    // 1. Hexagonal 3D Miniature Diorama Tiles (Width: 104, Height: 96)
+    this.createHexTileTexture('tile_farm', 'FARMLAND');
+    this.createHexTileTexture('tile_craft', 'CRAFT');
+    this.createHexTileTexture('tile_market', 'HAAT_SETTLEMENT');
+    this.createHexTileTexture('tile_civic', 'CIVIC');
+    this.createHexTileTexture('tile_music', 'MUSIC');
+    this.createHexTileTexture('tile_shrine', 'SHRINE');
+    this.createHexTileTexture('tile_clay', 'CLAY');
+    this.createHexTileTexture('tile_water', 'WATER');
+    this.createHexTileTexture('tile_forest', 'FOREST');
+    this.createHexTileTexture('tile_mountain', 'STONE');
 
-    // 1. Base Tile Texture (Isometric-style rounded diamond / tile slab 120x80)
-    const tileW = 120;
-    const tileH = 80;
-    
-    this.createTileTexture('tile_farm', '#15803d', '#eab308', '🌾', 'Farm');
-    this.createTileTexture('tile_craft', '#1e3a5f', '#ec4899', '🧵', 'Craft');
-    this.createTileTexture('tile_market', '#7c2d12', '#f59e0b', '🏪', 'Haat');
-    this.createTileTexture('tile_civic', '#451a03', '#93c5fd', '🏛️', 'Civic');
-    this.createTileTexture('tile_music', '#581c87', '#c084fc', '🎵', 'Music');
-    this.createTileTexture('tile_shrine', '#831843', '#fde047', '🪔', 'Shrine');
-    this.createTileTexture('tile_clay', '#9a3412', '#fdba74', '🏺', 'Clay');
-    this.createTileTexture('tile_water', '#0369a1', '#38bdf8', '💧', 'Water');
-    this.createTileTexture('tile_forest', '#14532d', '#4ade80', '🪵', 'Forest');
-    this.createTileTexture('tile_mountain', '#3f3f46', '#a1a1aa', '🪨', 'Stone');
+    // 2. Open Hex Placement Slot (translucent white glowing hex like Dorfromantik reference)
+    this.createHexSlotTexture();
 
-    // 2. 2D Top-down Character Spritesheet (128x32 - 4 frames: Down, Up, Left, Right)
+    // 3. Physical 3D Tile Stack (Bottom-Right Pile)
+    this.createHexStackTexture();
+
+    // 4. White Hex Count Badge
+    this.createHexBadgeTexture();
+
+    // 5. Minimalist Cultural Symbols & UI Icons
+    this.createCultureIcon();
+    this.createEventBadge('icon_fire_alert', '🔥', '#dc2626');
+    this.createEventBadge('icon_festival_alert', '🎉', '#7c3aed');
+
+    // 6. 2D Mini-game Assets
+    this.createMiniGameAssets();
+  }
+
+  private createHexTileTexture(key: string, theme: string): void {
+    const w = 110;
+    const h = 100;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+
+    const cx = w / 2;
+    const cy = 40; // Top face center
+    const radius = 46;
+    const depth = 16; // 3D side extrusion
+
+    // Helper: Generate Flat-Topped Hexagon Vertices
+    const getHexCorners = (centerX: number, centerY: number, r: number) => {
+      const pts: { x: number; y: number }[] = [];
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 180) * (60 * i + 30);
+        pts.push({
+          x: centerX + r * Math.cos(angle),
+          y: centerY + r * Math.sin(angle) * 0.72 // Isometric foreshortening
+        });
+      }
+      return pts;
+    };
+
+    const topCorners = getHexCorners(cx, cy, radius);
+    const bottomCorners = getHexCorners(cx, cy + depth, radius);
+
+    // 1. Soft Ambient Shadow under the tile
+    ctx.fillStyle = 'rgba(120, 60, 80, 0.16)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + depth + 10, radius * 0.95, radius * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. 3D Side Walls (Extrusion)
+    // Left side facet
+    ctx.fillStyle = '#4a3b32'; // Deep earth / timber
+    ctx.beginPath();
+    ctx.moveTo(topCorners[1].x, topCorners[1].y);
+    ctx.lineTo(topCorners[2].x, topCorners[2].y);
+    ctx.lineTo(bottomCorners[2].x, bottomCorners[2].y);
+    ctx.lineTo(bottomCorners[1].x, bottomCorners[1].y);
+    ctx.closePath();
+    ctx.fill();
+
+    // Front-Left facet
+    ctx.fillStyle = '#5c483c';
+    ctx.beginPath();
+    ctx.moveTo(topCorners[2].x, topCorners[2].y);
+    ctx.lineTo(topCorners[3].x, topCorners[3].y);
+    ctx.lineTo(bottomCorners[3].x, bottomCorners[3].y);
+    ctx.lineTo(bottomCorners[2].x, bottomCorners[2].y);
+    ctx.closePath();
+    ctx.fill();
+
+    // Front-Right facet
+    ctx.fillStyle = '#6e5849';
+    ctx.beginPath();
+    ctx.moveTo(topCorners[3].x, topCorners[3].y);
+    ctx.lineTo(topCorners[4].x, topCorners[4].y);
+    ctx.lineTo(bottomCorners[4].x, bottomCorners[4].y);
+    ctx.lineTo(bottomCorners[3].x, bottomCorners[3].y);
+    ctx.closePath();
+    ctx.fill();
+
+    // 3. Top Hexagon Surface (Color Palette based on Dorfromantik pastel/natural palette)
+    let baseColor = '#8A9A63'; // Grass
+    if (theme === 'WATER') baseColor = '#8DAFC5';
+    if (theme === 'FOREST') baseColor = '#546B43';
+    if (theme === 'FARMLAND') baseColor = '#7E9156';
+    if (theme === 'HAAT_SETTLEMENT' || theme === 'CRAFT' || theme === 'CIVIC') baseColor = '#8F9B6B';
+    if (theme === 'STONE') baseColor = '#78716C';
+    if (theme === 'CLAY') baseColor = '#9A6B4E';
+    if (theme === 'SHRINE' || theme === 'MUSIC') baseColor = '#7D8E5C';
+
+    ctx.fillStyle = baseColor;
+    ctx.beginPath();
+    ctx.moveTo(topCorners[0].x, topCorners[0].y);
+    for (let i = 1; i < 6; i++) {
+      ctx.lineTo(topCorners[i].x, topCorners[i].y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Soft inner edge highlight
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // 4. Miniature Diorama Environmental Details
+    if (theme === 'WATER') {
+      // Shimmering river stream
+      ctx.fillStyle = '#A3C6DC';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 26, 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.fillRect(cx - 12, cy - 3, 10, 2);
+      ctx.fillRect(cx + 4, cy + 2, 8, 2);
+    } else if (theme === 'FOREST') {
+      // Clusters of dense 3D miniature trees (Pines & Banyans)
+      const treePositions = [
+        { x: cx - 14, y: cy - 6, r: 6 },
+        { x: cx + 12, y: cy - 8, r: 7 },
+        { x: cx, y: cy + 4, r: 8 },
+        { x: cx - 18, y: cy + 6, r: 5 },
+        { x: cx + 16, y: cy + 7, r: 6 }
+      ];
+      for (const t of treePositions) {
+        // Tree shadow
+        ctx.fillStyle = 'rgba(30, 45, 20, 0.3)';
+        ctx.beginPath();
+        ctx.ellipse(t.x, t.y + 4, t.r * 0.9, t.r * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Tree canopy
+        ctx.fillStyle = '#3A4D2E';
+        ctx.beginPath();
+        ctx.arc(t.x, t.y - 2, t.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#556E42';
+        ctx.beginPath();
+        ctx.arc(t.x - 1, t.y - 4, t.r * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (theme === 'FARMLAND') {
+      // Terraced crop rows & golden harvest field
+      ctx.fillStyle = '#947E53';
+      ctx.beginPath();
+      ctx.ellipse(cx - 6, cy - 2, 24, 14, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+      // Crop strips
+      ctx.strokeStyle = '#D4AF37';
+      ctx.lineWidth = 2;
+      for (let i = -10; i <= 10; i += 5) {
+        ctx.beginPath();
+        ctx.moveTo(cx - 16, cy + i);
+        ctx.lineTo(cx + 12, cy + i - 4);
+        ctx.stroke();
+      }
+      // Tiny barn
+      ctx.fillStyle = '#E9D8B8';
+      ctx.fillRect(cx + 10, cy - 10, 8, 6);
+      ctx.fillStyle = '#B86D4F';
+      ctx.beginPath();
+      ctx.moveTo(cx + 9, cy - 10);
+      ctx.lineTo(cx + 14, cy - 14);
+      ctx.lineTo(cx + 19, cy - 10);
+      ctx.closePath();
+      ctx.fill();
+    } else if (theme === 'HAAT_SETTLEMENT' || theme === 'CRAFT' || theme === 'CIVIC') {
+      // Clustered miniature terracotta village houses & craft huts
+      const houses = [
+        { x: cx - 12, y: cy - 6, w: 9, h: 7, roof: '#B86D4F' },
+        { x: cx + 4, y: cy - 8, w: 10, h: 8, roof: '#C87D5F' },
+        { x: cx - 4, y: cy + 4, w: 11, h: 9, roof: '#A55D3F' },
+        { x: cx + 12, y: cy + 2, w: 8, h: 7, roof: '#D97706' }
+      ];
+      for (const hObj of houses) {
+        // House shadow
+        ctx.fillStyle = 'rgba(40, 30, 20, 0.25)';
+        ctx.fillRect(hObj.x - 1, hObj.y + hObj.h - 1, hObj.w + 2, 3);
+        // Wall (Cream plaster)
+        ctx.fillStyle = '#E9D8B8';
+        ctx.fillRect(hObj.x, hObj.y, hObj.w, hObj.h);
+        // Terracotta pitched roof
+        ctx.fillStyle = hObj.roof;
+        ctx.beginPath();
+        ctx.moveTo(hObj.x - 1, hObj.y);
+        ctx.lineTo(hObj.x + hObj.w / 2, hObj.y - 5);
+        ctx.lineTo(hObj.x + hObj.w + 1, hObj.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      // Pathway
+      ctx.strokeStyle = '#B8A585';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 20, cy + 10);
+      ctx.lineTo(cx + 20, cy - 10);
+      ctx.stroke();
+    } else if (theme === 'SHRINE' || theme === 'MUSIC') {
+      // Sacred dome / Melodic pavilion gazebo
+      ctx.fillStyle = '#E9D8B8';
+      ctx.fillRect(cx - 8, cy - 4, 16, 10);
+      // Terracotta dome
+      ctx.fillStyle = '#B86D4F';
+      ctx.beginPath();
+      ctx.arc(cx, cy - 6, 8, Math.PI, 0);
+      ctx.fill();
+      // Brass pinnacle lamp
+      ctx.fillStyle = '#F59E0B';
+      ctx.beginPath();
+      ctx.arc(cx, cy - 12, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      // Little garden trees
+      ctx.fillStyle = '#3A4D2E';
+      ctx.beginPath();
+      ctx.arc(cx - 14, cy + 4, 4, 0, Math.PI * 2);
+      ctx.arc(cx + 14, cy + 4, 4, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (theme === 'STONE') {
+      // Highland rock boulders
+      ctx.fillStyle = '#6B7280';
+      ctx.beginPath();
+      ctx.ellipse(cx - 8, cy - 2, 10, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx + 8, cy + 2, 8, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#9CA3AF';
+      ctx.beginPath();
+      ctx.arc(cx - 9, cy - 4, 4, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (theme === 'CLAY') {
+      // River clay pit with terracotta pottery urns
+      ctx.fillStyle = '#B45309';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 18, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#EA580C';
+      ctx.beginPath();
+      ctx.arc(cx - 5, cy + 1, 3, 0, Math.PI * 2);
+      ctx.arc(cx + 4, cy - 2, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    this.textures.addCanvas(key, canvas);
+  }
+
+  private createHexSlotTexture(): void {
+    // Open placement slot: Soft white translucent hex with subtle glow (exact Dorfromantik reference)
+    const w = 110;
+    const h = 100;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+
+    const cx = w / 2;
+    const cy = 40;
+    const radius = 45;
+
+    const getHexCorners = (centerX: number, centerY: number, r: number) => {
+      const pts: { x: number; y: number }[] = [];
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 180) * (60 * i + 30);
+        pts.push({
+          x: centerX + r * Math.cos(angle),
+          y: centerY + r * Math.sin(angle) * 0.72
+        });
+      }
+      return pts;
+    };
+
+    const topCorners = getHexCorners(cx, cy, radius);
+
+    // Translucent soft white-pink fill
+    ctx.fillStyle = 'rgba(255, 245, 250, 0.45)';
+    ctx.beginPath();
+    ctx.moveTo(topCorners[0].x, topCorners[0].y);
+    for (let i = 1; i < 6; i++) {
+      ctx.lineTo(topCorners[i].x, topCorners[i].y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Soft border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+    this.textures.addCanvas('hex_slot_empty', canvas);
+  }
+
+  private createHexStackTexture(): void {
+    // Physical 3D Tile Stack for bottom right
+    const w = 90;
+    const h = 130;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+
+    const cx = w / 2;
+    const radius = 38;
+
+    // Helper to draw a single hex slice
+    const drawSlice = (y: number, baseColor: string, sideColor: string) => {
+      const getHex = (cy: number) => {
+        const pts: { x: number; y: number }[] = [];
+        for (let i = 0; i < 6; i++) {
+          const angle = (Math.PI / 180) * (60 * i + 30);
+          pts.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) * 0.65 });
+        }
+        return pts;
+      };
+      const top = getHex(y);
+      const btm = getHex(y + 6);
+
+      // Side
+      ctx.fillStyle = sideColor;
+      ctx.beginPath();
+      ctx.moveTo(top[1].x, top[1].y);
+      ctx.lineTo(top[4].x, top[4].y);
+      ctx.lineTo(btm[4].x, btm[4].y);
+      ctx.lineTo(btm[1].x, btm[1].y);
+      ctx.closePath();
+      ctx.fill();
+
+      // Top
+      ctx.fillStyle = baseColor;
+      ctx.beginPath();
+      ctx.moveTo(top[0].x, top[0].y);
+      for (let i = 1; i < 6; i++) ctx.lineTo(top[i].x, top[i].y);
+      ctx.closePath();
+      ctx.fill();
+    };
+
+    // Draw stack of 12 slices
+    const colors = ['#546B43', '#765B3C', '#8A9A63', '#92704D', '#546B43', '#765B3C', '#8A9A63', '#B86D4F', '#546B43', '#765B3C', '#8A9A63', '#687E51'];
+    for (let i = 0; i < 12; i++) {
+      const y = 100 - i * 6;
+      drawSlice(y, colors[i % colors.length], '#382D24');
+    }
+
+    // Top slice with foliage miniature
+    drawSlice(28, '#765B3C', '#2F241C');
+    // Mini trees peeking out
+    ctx.fillStyle = '#3A4D2E';
+    ctx.beginPath();
+    ctx.arc(cx - 8, 22, 5, 0, Math.PI * 2);
+    ctx.arc(cx + 7, 20, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    this.textures.addCanvas('tile_stack_pile', canvas);
+  }
+
+  private createHexBadgeTexture(): void {
+    // Small white hexagonal badge for the tile counter "65"
+    const size = 38;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = 16;
+
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+    ctx.beginPath();
+    ctx.arc(cx, cy + 2, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // White hexagon
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 180) * (60 * i + 30);
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    this.textures.addCanvas('hex_badge_white', canvas);
+  }
+
+  private createCultureIcon(): void {
+    // Handcrafted cultural icon for top-right score
+    const size = 28;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    // Lit Diya / Sacred Flame
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(14, 18, 10, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#FDE047';
+    ctx.beginPath();
+    ctx.moveTo(14, 4);
+    ctx.quadraticCurveTo(8, 14, 14, 16);
+    ctx.quadraticCurveTo(20, 14, 14, 4);
+    ctx.fill();
+
+    this.textures.addCanvas('icon_culture_badge', canvas);
+  }
+
+  private createEventBadge(key: string, emoji: string, bgColor: string): void {
+    const size = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = bgColor;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, size / 2, size / 2 + 1);
+    this.textures.addCanvas(key, canvas);
+  }
+
+  private createMiniGameAssets(): void {
+    // Character Spritesheet (128x32 - Down, Up, Left, Right)
     const charCanvas = document.createElement('canvas');
     charCanvas.width = 128;
     charCanvas.height = 32;
@@ -61,159 +492,107 @@ export class BootScene extends Phaser.Scene {
 
     for (let f = 0; f < 4; f++) {
       const ox = f * 32;
-      // Shadow
-      ctxC.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctxC.fillStyle = 'rgba(0, 0, 0, 0.25)';
       ctxC.beginPath();
-      ctxC.ellipse(ox + 16, 28, 9, 4, 0, 0, Math.PI * 2);
+      ctxC.ellipse(ox + 16, 28, 8, 4, 0, 0, Math.PI * 2);
       ctxC.fill();
 
-      // Body (Traditional tunic / Kurta with cultural drape)
-      ctxC.fillStyle = '#d97706'; // Saffron amber
-      ctxC.fillRect(ox + 10, 14, 12, 11);
-      // Sash/Angavastram
-      ctxC.fillStyle = '#dc2626';
-      ctxC.fillRect(ox + 9, 14, 4, 11);
+      // Kurta & Sash
+      ctxC.fillStyle = '#B86D4F';
+      ctxC.fillRect(ox + 11, 14, 10, 11);
+      ctxC.fillStyle = '#D97706';
+      ctxC.fillRect(ox + 10, 14, 3, 11);
 
-      // Head
-      ctxC.fillStyle = '#fcd34d'; // Warm skin tone
+      // Head & Turban
+      ctxC.fillStyle = '#FCD34D';
       ctxC.beginPath();
-      ctxC.arc(ox + 16, 10, 6, 0, Math.PI * 2);
+      ctxC.arc(ox + 16, 10, 5.5, 0, Math.PI * 2);
       ctxC.fill();
 
-      // Hair / Turban
-      ctxC.fillStyle = '#b45309';
+      ctxC.fillStyle = '#92400E';
       ctxC.beginPath();
-      ctxC.arc(ox + 16, 8, 6.5, Math.PI, Math.PI * 2);
+      ctxC.arc(ox + 16, 8, 6, Math.PI, Math.PI * 2);
       ctxC.fill();
 
-      // Face direction features
-      ctxC.fillStyle = '#1e293b';
       if (f === 0) { // Down
+        ctxC.fillStyle = '#1E293B';
         ctxC.fillRect(ox + 13, 10, 2, 2);
         ctxC.fillRect(ox + 17, 10, 2, 2);
-      } else if (f === 1) { // Up
-        // Back of turban
-        ctxC.fillStyle = '#92400e';
-        ctxC.arc(ox + 16, 9, 4, 0, Math.PI * 2);
-        ctxC.fill();
-      } else if (f === 2) { // Left
-        ctxC.fillRect(ox + 12, 10, 2, 2);
-      } else if (f === 3) { // Right
-        ctxC.fillRect(ox + 18, 10, 2, 2);
       }
     }
-    textures.addCanvas('player_sheet', charCanvas);
+    this.textures.addCanvas('player_sheet', charCanvas);
 
-    // 3. Fire Animation Frames (128x32 - 4 frames)
+    // Fire animation sheet
     const fireCanvas = document.createElement('canvas');
     fireCanvas.width = 128;
     fireCanvas.height = 32;
     const ctxF = fireCanvas.getContext('2d')!;
-
     for (let f = 0; f < 4; f++) {
       const ox = f * 32;
       const hOffset = Math.sin(f * Math.PI / 2) * 3;
-
-      // Outer orange flame
-      ctxF.fillStyle = '#ea580c';
+      ctxF.fillStyle = '#EA580C';
       ctxF.beginPath();
-      ctxF.moveTo(ox + 6, 28);
-      ctxF.quadraticCurveTo(ox + 2, 14, ox + 16, 4 + hOffset);
-      ctxF.quadraticCurveTo(ox + 30, 14, ox + 26, 28);
+      ctxF.moveTo(ox + 8, 28);
+      ctxF.quadraticCurveTo(ox + 4, 14, ox + 16, 6 + hOffset);
+      ctxF.quadraticCurveTo(ox + 28, 14, ox + 24, 28);
       ctxF.closePath();
       ctxF.fill();
 
-      // Inner yellow flame
-      ctxF.fillStyle = '#fde047';
+      ctxF.fillStyle = '#FDE047';
       ctxF.beginPath();
-      ctxF.moveTo(ox + 10, 28);
-      ctxF.quadraticCurveTo(ox + 8, 18, ox + 16, 10 + hOffset);
-      ctxF.quadraticCurveTo(ox + 24, 18, ox + 22, 28);
-      ctxF.closePath();
-      ctxF.fill();
-
-      // Core white heat
-      ctxF.fillStyle = '#ffffff';
-      ctxF.beginPath();
-      ctxF.arc(ox + 16, 22, 3, 0, Math.PI * 2);
+      ctxF.arc(ox + 16, 22, 4, 0, Math.PI * 2);
       ctxF.fill();
     }
-    textures.addCanvas('fire_sheet', fireCanvas);
+    this.textures.addCanvas('fire_sheet', fireCanvas);
 
-    // 4. Water Well Texture (48x48)
+    // Water Well
     const wellCanvas = document.createElement('canvas');
-    wellCanvas.width = 48;
-    wellCanvas.height = 48;
+    wellCanvas.width = 44;
+    wellCanvas.height = 44;
     const ctxW = wellCanvas.getContext('2d')!;
-    // Well stone rim
-    ctxW.fillStyle = '#52525b';
+    ctxW.fillStyle = '#52525B';
     ctxW.beginPath();
-    ctxW.ellipse(24, 30, 18, 12, 0, 0, Math.PI * 2);
+    ctxW.ellipse(22, 28, 16, 10, 0, 0, Math.PI * 2);
     ctxW.fill();
-    ctxW.lineWidth = 4;
-    ctxW.strokeStyle = '#71717a';
-    ctxW.stroke();
-    // Well water inside
-    ctxW.fillStyle = '#0284c7';
+    ctxW.fillStyle = '#8DAFC5';
     ctxW.beginPath();
-    ctxW.ellipse(24, 30, 12, 7, 0, 0, Math.PI * 2);
+    ctxW.ellipse(22, 28, 10, 6, 0, 0, Math.PI * 2);
     ctxW.fill();
-    // Wooden canopy frame
-    ctxW.fillStyle = '#78350f';
-    ctxW.fillRect(8, 8, 4, 24);
-    ctxW.fillRect(36, 8, 4, 24);
-    ctxW.fillRect(6, 6, 36, 6);
-    // Rope & bucket
-    ctxW.fillStyle = '#fbbf24';
-    ctxW.fillRect(23, 12, 2, 10);
-    ctxW.fillStyle = '#0369a1';
-    ctxW.fillRect(20, 20, 8, 6);
-    textures.addCanvas('water_well', wellCanvas);
+    ctxW.fillStyle = '#765B3C';
+    ctxW.fillRect(8, 6, 4, 24);
+    ctxW.fillRect(32, 6, 4, 24);
+    ctxW.fillRect(6, 4, 32, 6);
+    this.textures.addCanvas('water_well', wellCanvas);
 
-    // 5. Water Bucket Icon (32x32)
+    // Water bucket
     const bucketCanvas = document.createElement('canvas');
-    bucketCanvas.width = 32;
-    bucketCanvas.height = 32;
+    bucketCanvas.width = 28;
+    bucketCanvas.height = 28;
     const ctxB = bucketCanvas.getContext('2d')!;
-    ctxB.fillStyle = '#0284c7';
-    ctxB.beginPath();
-    ctxB.moveTo(8, 12);
-    ctxB.lineTo(24, 12);
-    ctxB.lineTo(21, 28);
-    ctxB.lineTo(11, 28);
-    ctxB.closePath();
-    ctxB.fill();
-    ctxB.strokeStyle = '#38bdf8';
-    ctxB.lineWidth = 2;
-    ctxB.stroke();
-    // Bucket handle
-    ctxB.beginPath();
-    ctxB.arc(16, 12, 8, Math.PI, 0);
-    ctxB.strokeStyle = '#e2e8f0';
-    ctxB.stroke();
-    textures.addCanvas('water_bucket', bucketCanvas);
+    ctxB.fillStyle = '#8DAFC5';
+    ctxB.fillRect(6, 10, 16, 14);
+    ctxB.strokeStyle = '#FFFFFF';
+    ctxB.lineWidth = 1.5;
+    ctxB.strokeRect(6, 10, 16, 14);
+    this.textures.addCanvas('water_bucket', bucketCanvas);
 
-    // 6. Particles
-    this.createCircleParticle('particle_water', '#38bdf8', 4);
-    this.createCircleParticle('particle_smoke', '#64748b', 6);
-    this.createCircleParticle('particle_spark', '#fbbf24', 3);
-    this.createCircleParticle('particle_confetti', '#f43f5e', 4);
+    // Particles
+    this.createCircleParticle('particle_water', '#8DAFC5', 3);
+    this.createCircleParticle('particle_smoke', '#94A3B8', 5);
+    this.createCircleParticle('particle_spark', '#FDE047', 3);
+    this.createCircleParticle('particle_confetti', '#F43F5E', 3);
 
-    // 7. Event Indicators
-    this.createEventBadge('icon_fire_alert', '🔥', '#dc2626');
-    this.createEventBadge('icon_festival_alert', '🎉', '#7c3aed');
-
-    // 8. 2D Mini-game Workshop Wall/Floor tiles
+    // Floor & Wall
     const floorCanvas = document.createElement('canvas');
     floorCanvas.width = 32;
     floorCanvas.height = 32;
     const ctxFl = floorCanvas.getContext('2d')!;
-    ctxFl.fillStyle = '#78350f';
+    ctxFl.fillStyle = '#78350F';
     ctxFl.fillRect(0, 0, 32, 32);
-    ctxFl.strokeStyle = '#92400e';
+    ctxFl.strokeStyle = '#92400E';
     ctxFl.lineWidth = 1;
     ctxFl.strokeRect(0, 0, 32, 32);
-    textures.addCanvas('floor_wood', floorCanvas);
+    this.textures.addCanvas('floor_wood', floorCanvas);
 
     const wallCanvas = document.createElement('canvas');
     wallCanvas.width = 32;
@@ -221,105 +600,25 @@ export class BootScene extends Phaser.Scene {
     const ctxWl = wallCanvas.getContext('2d')!;
     ctxWl.fillStyle = '#475569';
     ctxWl.fillRect(0, 0, 32, 32);
-    ctxWl.strokeStyle = '#64748b';
+    ctxWl.strokeStyle = '#64748B';
     ctxWl.lineWidth = 2;
     ctxWl.strokeRect(1, 1, 30, 30);
-    textures.addCanvas('wall_stone', wallCanvas);
+    this.textures.addCanvas('wall_stone', wallCanvas);
 
-    // 9. Festival Altar (64x48)
+    // Altar
     const altarCanvas = document.createElement('canvas');
-    altarCanvas.width = 64;
-    altarCanvas.height = 48;
+    altarCanvas.width = 56;
+    altarCanvas.height = 42;
     const ctxA = altarCanvas.getContext('2d')!;
-    ctxA.fillStyle = '#b45309';
-    ctxA.fillRect(4, 12, 56, 32);
-    ctxA.fillStyle = '#dc2626'; // Red ceremonial cloth
-    ctxA.fillRect(6, 12, 52, 10);
-    // Floral Garland
-    ctxA.fillStyle = '#fbbf24';
-    for (let i = 8; i <= 56; i += 8) {
-      ctxA.beginPath();
-      ctxA.arc(i, 22, 3, 0, Math.PI * 2);
-      ctxA.fill();
-    }
-    // Lit brass lamp
-    ctxA.fillStyle = '#f59e0b';
-    ctxA.beginPath();
-    ctxA.ellipse(32, 10, 6, 3, 0, 0, Math.PI * 2);
-    ctxA.fill();
-    ctxA.fillStyle = '#ef4444';
-    ctxA.beginPath();
-    ctxA.arc(32, 5, 2, 0, Math.PI * 2);
-    ctxA.fill();
-    textures.addCanvas('festival_altar', altarCanvas);
+    ctxA.fillStyle = '#B45309';
+    ctxA.fillRect(4, 10, 48, 28);
+    ctxA.fillStyle = '#DC2626';
+    ctxA.fillRect(6, 10, 44, 8);
+    this.textures.addCanvas('festival_altar', altarCanvas);
 
-    // 10. Gatherable Offerings (32x32)
-    this.createItemIcon('offering_garland', '🌺', '#ec4899');
-    this.createItemIcon('offering_grain_pot', '🌾', '#eab308');
-    this.createItemIcon('offering_flute', '🪈', '#38bdf8');
-  }
-
-  private createTileTexture(key: string, baseColor: string, accentColor: string, emoji: string, label: string): void {
-    const w = 120;
-    const h = 80;
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d')!;
-
-    // Draw 2.5D Isometric Diamond Slab
-    const cx = w / 2;
-    const cy = h / 2;
-    const rx = 52;
-    const ry = 28;
-    const depth = 12;
-
-    // Bottom 3D slab extrusion
-    ctx.fillStyle = '#0f172a';
-    ctx.beginPath();
-    ctx.moveTo(cx - rx, cy);
-    ctx.lineTo(cx, cy + ry);
-    ctx.lineTo(cx, cy + ry + depth);
-    ctx.lineTo(cx - rx, cy + depth);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath();
-    ctx.moveTo(cx, cy + ry);
-    ctx.lineTo(cx + rx, cy);
-    ctx.lineTo(cx + rx, cy + depth);
-    ctx.lineTo(cx, cy + ry + depth);
-    ctx.closePath();
-    ctx.fill();
-
-    // Top surface
-    ctx.fillStyle = baseColor;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - ry);
-    ctx.lineTo(cx + rx, cy);
-    ctx.lineTo(cx, cy + ry);
-    ctx.lineTo(cx - rx, cy);
-    ctx.closePath();
-    ctx.fill();
-
-    // Subtle edge highlight
-    ctx.strokeStyle = accentColor;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Center cultural motif / symbol
-    ctx.font = '22px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(emoji, cx, cy - 4);
-
-    // Label
-    ctx.font = 'bold 10px "Plus Jakarta Sans", sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(label, cx, cy + 16);
-
-    this.textures.addCanvas(key, canvas);
+    this.createItemIcon('offering_garland', '🌺', '#EC4899');
+    this.createItemIcon('offering_grain_pot', '🌾', '#EAB308');
+    this.createItemIcon('offering_flute', '🪈', '#38BDF8');
   }
 
   private createCircleParticle(key: string, color: string, radius: number): void {
@@ -334,54 +633,23 @@ export class BootScene extends Phaser.Scene {
     this.textures.addCanvas(key, canvas);
   }
 
-  private createEventBadge(key: string, emoji: string, bgColor: string): void {
-    const size = 36;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = bgColor;
-    ctx.beginPath();
-    ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-
-    ctx.font = '18px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(emoji, size / 2, size / 2 + 1);
-    this.textures.addCanvas(key, canvas);
-  }
-
   private createItemIcon(key: string, emoji: string, bgColor: string): void {
     const canvas = document.createElement('canvas');
-    canvas.width = 32;
-    canvas.height = 32;
+    canvas.width = 28;
+    canvas.height = 28;
     const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.beginPath();
-    ctx.arc(16, 26, 8, 0, Math.PI * 2);
-    ctx.fill();
-
     ctx.fillStyle = bgColor;
     ctx.beginPath();
-    ctx.arc(16, 14, 12, 0, Math.PI * 2);
+    ctx.arc(14, 14, 11, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    ctx.font = '14px sans-serif';
+    ctx.font = '13px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(emoji, 16, 14);
+    ctx.fillText(emoji, 14, 14);
     this.textures.addCanvas(key, canvas);
   }
 
   private createAnimations(): void {
-    // Fire animation
     this.anims.create({
       key: 'fire_flicker',
       frames: [
@@ -394,7 +662,6 @@ export class BootScene extends Phaser.Scene {
       repeat: -1
     });
 
-    // Character animations
     this.anims.create({
       key: 'player_walk_down',
       frames: [{ key: 'player_sheet', frame: 0 }],

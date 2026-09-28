@@ -18,7 +18,6 @@ export class ResultScene extends Phaser.Scene {
     this.state = StateManager.getInstance();
     const { width, height } = this.cameras.main;
 
-    // Resolve event in state system
     const outcome = this.state.eventSystem.resolveEventOutcome(
       data.success,
       this.state.tileSystem,
@@ -26,85 +25,65 @@ export class ResultScene extends Phaser.Scene {
     );
     this.state.scoringSystem.addEventScore(outcome.points);
 
-    // Background overlay
+    // Pastel pink background
     const bg = this.add.graphics();
-    bg.fillGradientStyle(0x0a192f, 0x0a192f, 0x020c1b, 0x020c1b, 1);
+    bg.fillGradientStyle(0xF2B5CE, 0xF2B5CE, 0xE5A0BC, 0xE5A0BC, 1);
     bg.fillRect(0, 0, width, height);
 
-    // Modal Box
-    const box = this.add.rectangle(width / 2, height / 2, 600, 420, 0x0f172a, 0.95)
-      .setStrokeStyle(2, data.success ? 0x22c55e : 0xef4444);
+    // Clean white paper card
+    const card = this.add.rectangle(width / 2, height / 2, 520, 340, 0xFFFFFF, 0.95)
+      .setStrokeStyle(1.5, data.success ? 0x546B43 : 0xB86D4F);
 
-    // Title
-    const titleEmoji = data.success ? '🏆' : '⚠️';
-    const titleText = data.success ? 'EVENT RESOLVED: SUCCESS!' : 'EVENT RESULT: COMPLETED';
-    this.add.text(width / 2, height / 2 - 160, `${titleEmoji} ${titleText}`, {
-      fontFamily: 'Cinzel, serif',
-      fontSize: '24px',
+    const titleEmoji = data.success ? '✨' : '⚠️';
+    const titleText = data.success ? 'COMMUNITY CRISIS RESOLVED' : 'EVENT COMPLETED';
+
+    this.add.text(width / 2, height / 2 - 120, `${titleEmoji} ${titleText}`, {
+      fontFamily: 'Cinzel, Georgia, serif',
+      fontSize: '20px',
       fontStyle: 'bold',
-      color: data.success ? '#4ade80' : '#f87171'
+      color: data.success ? '#3A4D2E' : '#991B1B',
+      letterSpacing: 2
     }).setOrigin(0.5);
 
-    this.add.text(width / 2, height / 2 - 120, data.eventTitle, {
+    this.add.text(width / 2, height / 2 - 85, data.eventTitle, {
       fontFamily: 'Plus Jakarta Sans',
-      fontSize: '16px',
-      color: '#94a3b8'
+      fontSize: '13px',
+      color: '#64748B'
     }).setOrigin(0.5);
 
-    // Message narrative
-    const descBox = this.add.rectangle(width / 2, height / 2 - 40, 520, 90, 0x1e293b, 0.8)
-      .setStrokeStyle(1, 0x334155);
-    this.add.text(width / 2, height / 2 - 40, outcome.message, {
+    // Narrative
+    this.add.text(width / 2, height / 2 - 25, outcome.message, {
       fontFamily: 'Plus Jakarta Sans',
-      fontSize: '14px',
-      color: '#e2e8f0',
+      fontSize: '13px',
+      color: '#332924',
       align: 'center',
-      wordWrap: { width: 480 }
+      wordWrap: { width: 440 }
     }).setOrigin(0.5);
 
-    // Rewards / Consequences breakdown
-    const rewardsY = height / 2 + 50;
-    if (data.success) {
-      this.add.text(width / 2, rewardsY, `✨ Rewards Earned:\n• +${outcome.points} Development Points\n• +${outcome.harmony} Cultural Harmony Score\n• Building status: UNDAMAGED & ACTIVE`, {
-        fontFamily: 'Plus Jakarta Sans',
-        fontSize: '14px',
-        color: '#fbbf24',
-        lineSpacing: 6,
-        align: 'center'
-      }).setOrigin(0.5);
-    } else {
-      this.add.text(width / 2, rewardsY, `Consequences:\n• Building sustained smoke damage\n• Reduced efficiency until repaired\n• +0 Development Points`, {
-        fontFamily: 'Plus Jakarta Sans',
-        fontSize: '14px',
-        color: '#f87171',
-        lineSpacing: 6,
-        align: 'center'
-      }).setOrigin(0.5);
-    }
+    // Reward / Consequence
+    const rewardText = data.success
+      ? `• +${outcome.points} Score  •  +${outcome.harmony} Harmony  •  Building Protected`
+      : `• Building sustained minor damage  •  +0 Points`;
 
-    // Return to Island Button
-    const returnBtn = this.add.rectangle(width / 2, height / 2 + 150, 260, 48, 0x0284c7)
-      .setStrokeStyle(2, 0x38bdf8)
+    this.add.text(width / 2, height / 2 + 45, rewardText, {
+      fontFamily: 'Plus Jakarta Sans',
+      fontSize: '12px',
+      fontStyle: 'bold',
+      color: data.success ? '#546B43' : '#B86D4F'
+    }).setOrigin(0.5);
+
+    // Return button
+    const returnBtn = this.add.rectangle(width / 2, height / 2 + 115, 220, 40, 0xB86D4F)
+      .setStrokeStyle(1.5, 0xFFFFFF)
       .setInteractive({ useHandCursor: true });
 
-    const returnText = this.add.text(width / 2, height / 2 + 150, 'RETURN TO ISLAND →', {
-      fontFamily: 'Cinzel, serif',
-      fontSize: '16px',
+    this.add.text(width / 2, height / 2 + 115, 'RETURN TO ISLAND →', {
+      fontFamily: 'Cinzel, Georgia, serif',
+      fontSize: '13px',
       fontStyle: 'bold',
-      color: '#ffffff'
+      color: '#ffffff',
+      letterSpacing: 1.5
     }).setOrigin(0.5);
-
-    returnBtn.on('pointerover', () => {
-      returnBtn.setFillStyle(0x0369a1);
-      returnBtn.setScale(1.03);
-      returnText.setScale(1.03);
-    });
-
-    returnBtn.on('pointerout', () => {
-      returnBtn.setFillStyle(0x0284c7);
-      returnBtn.setScale(1.0);
-      returnText.setScale(1.0);
-    });
 
     returnBtn.on('pointerdown', () => {
       this.state.soundSystem.playTilePlace();

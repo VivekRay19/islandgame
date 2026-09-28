@@ -1,10 +1,10 @@
 import { GameEventDefinition, GAME_EVENTS } from '../data/events';
-import { TileSystem, PlacedTileInstance } from './TileSystem';
+import { TileSystem, PlacedHexTileInstance } from './TileSystem';
 import { ResourceSystem } from './ResourceSystem';
 
 export interface ActiveEventInstance {
   eventDef: GameEventDefinition;
-  targetTile: PlacedTileInstance;
+  targetTile: PlacedHexTileInstance;
   triggeredAtTime: number;
 }
 
@@ -48,7 +48,7 @@ export class EventSystem {
   public checkRandomEventTrigger(tileSystem: TileSystem, round: number): ActiveEventInstance | null {
     if (this.activeEvent) return this.activeEvent;
 
-    // Fire event prioritised on round 1/2 as vertical slice demo, then chance of positive festival
+    // Fire event on round 1/2 for demonstration, then random positive/challenge
     if (round === 1 || round === 2) {
       return this.triggerSpecificEvent('fire_event', tileSystem);
     } else {
@@ -72,7 +72,6 @@ export class EventSystem {
 
     if (success) {
       const reward = eventDef.successReward;
-      // Add resources
       for (const [resKey, amt] of Object.entries(reward.resources)) {
         if (amt && amt > 0) {
           resourceSystem.addResource(resKey as any, amt);
@@ -87,7 +86,7 @@ export class EventSystem {
     } else {
       const penalty = eventDef.failurePenalty;
       if (penalty.damagedBuilding) {
-        tileSystem.setTileDamaged(targetTile.gx, targetTile.gy, true);
+        tileSystem.setTileDamaged(targetTile.q, targetTile.r, true);
       }
       for (const [resKey, amt] of Object.entries(penalty.lostResources)) {
         if (amt && amt > 0) {

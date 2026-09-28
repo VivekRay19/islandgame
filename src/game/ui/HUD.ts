@@ -1,78 +1,68 @@
 import Phaser from 'phaser';
 import { StateManager } from '../systems/StateManager';
-import { RESOURCES, ResourceId } from '../data/resources';
 
 export class HUD {
   private scene: Phaser.Scene;
   private state: StateManager;
   private container: Phaser.GameObjects.Container;
+  private titleText!: Phaser.GameObjects.Text;
+  private subtitleText!: Phaser.GameObjects.Text;
   private scoreText!: Phaser.GameObjects.Text;
-  private roundText!: Phaser.GameObjects.Text;
-  private islandTitleText!: Phaser.GameObjects.Text;
-  private resourceIcons: Map<ResourceId, Phaser.GameObjects.Text> = new Map();
+  private scoreIcon!: Phaser.GameObjects.Image;
+  private harmonyText!: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     this.state = StateManager.getInstance();
     this.container = scene.add.container(0, 0).setDepth(1000).setScrollFactor(0);
 
-    this.createTopBar();
+    this.createMinimalHUD();
   }
 
-  private createTopBar(): void {
-    const width = this.scene.cameras.main.width;
+  private createMinimalHUD(): void {
+    const { width } = this.scene.cameras.main;
 
-    // Glassmorphic top bar background
-    const barBg = this.scene.add.rectangle(width / 2, 28, width - 24, 48, 0x0f172a, 0.85)
-      .setStrokeStyle(1, 0x334155, 0.8);
-    this.container.add(barBg);
-
-    // Island Name & Dynamic Emergent Title
-    this.islandTitleText = this.scene.add.text(24, 18, '', {
-      fontFamily: 'Cinzel, serif',
-      fontSize: '15px',
+    // 1. TOP-LEFT: Clean, minimal branding (Dorfromantik-inspired)
+    this.titleText = this.scene.add.text(32, 28, 'ISLAND HAAT', {
+      fontFamily: 'Cinzel, Georgia, serif',
+      fontSize: '20px',
       fontStyle: 'bold',
-      color: '#f59e0b'
+      color: '#ffffff',
+      letterSpacing: 3,
+      shadow: { blur: 6, color: 'rgba(120, 60, 80, 0.4)', fill: true }
     });
-    this.container.add(this.islandTitleText);
+    this.container.add(this.titleText);
 
-    // Round & Level Indicator
-    this.roundText = this.scene.add.text(width / 2, 18, '', {
+    this.subtitleText = this.scene.add.text(33, 54, '', {
       fontFamily: 'Plus Jakarta Sans, sans-serif',
-      fontSize: '13px',
+      fontSize: '11px',
       fontStyle: 'bold',
-      color: '#e2e8f0'
-    }).setOrigin(0.5, 0);
-    this.container.add(this.roundText);
+      color: 'rgba(255, 255, 255, 0.85)',
+      letterSpacing: 1.5
+    });
+    this.container.add(this.subtitleText);
 
-    // Total Score
-    this.scoreText = this.scene.add.text(width - 24, 18, '', {
+    // 2. TOP-RIGHT: Clean floating Score & Cultural Icon
+    this.scoreText = this.scene.add.text(width - 64, 28, '0', {
       fontFamily: 'Plus Jakarta Sans, sans-serif',
-      fontSize: '14px',
+      fontSize: '22px',
       fontStyle: 'bold',
-      color: '#38bdf8'
+      color: '#ffffff',
+      shadow: { blur: 6, color: 'rgba(120, 60, 80, 0.4)', fill: true }
     }).setOrigin(1, 0);
     this.container.add(this.scoreText);
 
-    // Resource Inventory Bar (Bottom left/center)
-    const resBg = this.scene.add.rectangle(width / 2, 70, width - 24, 30, 0x0f172a, 0.75)
-      .setStrokeStyle(1, 0x1e293b, 0.8);
-    this.container.add(resBg);
+    this.scoreIcon = this.scene.add.image(width - 44, 40, 'icon_culture_badge')
+      .setScale(0.9);
+    this.container.add(this.scoreIcon);
 
-    const resources: ResourceId[] = ['grain', 'fibre', 'wood', 'stone', 'clay', 'water', 'music', 'ore'];
-    const startX = 36;
-    const spacing = (width - 72) / resources.length;
-
-    resources.forEach((resId, idx) => {
-      const def = RESOURCES[resId];
-      const resText = this.scene.add.text(startX + idx * spacing, 63, `${def.symbol} 0`, {
-        fontFamily: 'Plus Jakarta Sans, sans-serif',
-        fontSize: '12px',
-        color: def.color
-      });
-      this.resourceIcons.set(resId, resText);
-      this.container.add(resText);
-    });
+    this.harmonyText = this.scene.add.text(width - 44, 60, '', {
+      fontFamily: 'Plus Jakarta Sans, sans-serif',
+      fontSize: '10px',
+      fontStyle: 'bold',
+      color: 'rgba(255, 255, 255, 0.85)'
+    }).setOrigin(1, 0);
+    this.container.add(this.harmonyText);
 
     this.refresh();
   }
@@ -84,18 +74,9 @@ export class HUD {
     const totalScore = this.state.scoringSystem.getTotalScore(harmony);
     const emergentTitle = this.state.culturalSystem.getEmergentIslandTitle(this.state.tileSystem);
 
-    this.islandTitleText.setText(`${this.state.islandName} • ${emergentTitle}`);
-    this.roundText.setText(`Round ${round}/6 • Level ${level} • Harmony +${harmony} pts`);
-    this.scoreText.setText(`🏆 Score: ${totalScore} pts`);
-
-    // Update resource counts
-    const inv = this.state.resourceSystem.getInventory();
-    for (const [resId, textObj] of this.resourceIcons.entries()) {
-      const count = inv[resId] || 0;
-      const def = RESOURCES[resId];
-      textObj.setText(`${def.symbol} ${def.name}: ${count}`);
-      textObj.setAlpha(count > 0 ? 1 : 0.45);
-    }
+    this.subtitleText.setText(`ROUND ${round} • LEVEL ${level} • ${emergentTitle.toUpperCase()}`);
+    this.scoreText.setText(`${totalScore}`);
+    this.harmonyText.setText(`+${harmony} Harmony`);
   }
 
   public destroy(): void {
