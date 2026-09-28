@@ -2,15 +2,14 @@ import Phaser from 'phaser';
 import { StateManager } from '../systems/StateManager';
 import { HUD } from '../ui/HUD';
 import { PlacedHexTileInstance, HEX_DIRECTIONS } from '../systems/TileSystem';
-import { TileDefinition } from '../data/tiles';
 
 export class IslandScene extends Phaser.Scene {
   private state!: StateManager;
   private hud!: HUD;
 
   // Coordinate System metrics (Hexagonal Isometric Lattice)
-  private readonly HEX_SPACING_X = 74;
-  private readonly HEX_SPACING_Y = 44;
+  private readonly HEX_SPACING_X = 76;
+  private readonly HEX_SPACING_Y = 46;
   private originX: number = 0;
   private originY: number = 0;
 
@@ -18,7 +17,7 @@ export class IslandScene extends Phaser.Scene {
   private islandWorldContainer!: Phaser.GameObjects.Container;
   private slotsContainer!: Phaser.GameObjects.Container;
   private connectionsContainer!: Phaser.GameObjects.Graphics;
-  private hudContainer!: Phaser.GameObjects.Container;
+  private particlesContainer!: Phaser.GameObjects.Container;
 
   // Tile Visuals
   private tileObjects: Map<string, { image: Phaser.GameObjects.Image; alertBadge?: Phaser.GameObjects.Image }> = new Map();
@@ -45,6 +44,9 @@ export class IslandScene extends Phaser.Scene {
   // Event Alert Pill
   private eventPillContainer!: Phaser.GameObjects.Container;
 
+  // Ambient Birds
+  private birds: Phaser.GameObjects.Text[] = [];
+
   constructor() {
     super({ key: 'IslandScene' });
   }
@@ -57,34 +59,35 @@ export class IslandScene extends Phaser.Scene {
     this.originX = width * 0.46;
     this.originY = height * 0.44;
 
-    // 1. Soft Pastel Pink Background (#E8A8C2) with very subtle radial light
+    // 1. Soft Pastel Pink Background (#E8A8C2) with warm central radial wash
     const bg = this.add.graphics().setDepth(0);
-    bg.fillGradientStyle(0xF2B5CE, 0xF2B5CE, 0xE5A0BC, 0xE5A0BC, 1);
+    bg.fillGradientStyle(0xF4B8D0, 0xF4B8D0, 0xE59EB8, 0xE59EB8, 1);
     bg.fillRect(0, 0, width, height);
 
     // Subtle radial light around the island center
-    const radialGlow = this.add.ellipse(this.originX, this.originY, width * 0.7, height * 0.75, 0xFFFFFF, 0.08)
+    this.add.ellipse(this.originX, this.originY, width * 0.72, height * 0.78, 0xFFFFFF, 0.09)
       .setDepth(1);
 
     // World Containers
     this.connectionsContainer = this.add.graphics().setDepth(5);
     this.slotsContainer = this.add.container(0, 0).setDepth(6);
     this.islandWorldContainer = this.add.container(0, 0).setDepth(10);
-    this.hudContainer = this.add.container(0, 0).setDepth(500);
+    this.particlesContainer = this.add.container(0, 0).setDepth(40);
 
     // 2. Ghost Placement Preview Tile
     this.ghostTileSprite = this.add.image(0, 0, 'tile_farm')
-      .setAlpha(0.75)
+      .setAlpha(0.78)
       .setVisible(false)
-      .setDepth(20);
+      .setDepth(25);
+
     this.ghostTileText = this.add.text(0, 0, '', {
       fontFamily: 'Plus Jakarta Sans',
       fontSize: '11px',
       fontStyle: 'bold',
       color: '#ffffff',
-      backgroundColor: 'rgba(90, 40, 60, 0.65)',
-      padding: { x: 6, y: 2 }
-    }).setOrigin(0.5).setVisible(false).setDepth(21);
+      backgroundColor: 'rgba(70, 40, 50, 0.7)',
+      padding: { x: 7, y: 3 }
+    }).setOrigin(0.5).setVisible(false).setDepth(26);
 
     // 3. Initialize Minimalist Top HUD
     this.hud = new HUD(this);
@@ -105,7 +108,10 @@ export class IslandScene extends Phaser.Scene {
     this.createEventAlertPill(width);
     this.refreshEventState();
 
-    // 8. Input Listeners
+    // 8. Ambient Micro-Animations (Drifting Birds & Chimney Smoke)
+    this.createAmbientWorldLife(width, height);
+
+    // 9. Input Listeners & Smooth Camera Panning
     this.setupInteractions();
 
     // Ensure initial event for immediate vertical slice demo
@@ -139,7 +145,7 @@ export class IslandScene extends Phaser.Scene {
 
     const placedTiles = this.state.tileSystem.getAllPlacedTiles();
 
-    // Sort isometric depth by row r, then q
+    // Isometric depth sorting by r (row), then q (column)
     placedTiles.sort((a, b) => (a.r !== b.r ? a.r - b.r : a.q - b.q));
 
     const activeEvent = this.state.eventSystem.getActiveEvent();
@@ -153,15 +159,15 @@ export class IslandScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
 
       if (tile.isDamaged) {
-        img.setTint(0x8a7e7a); // Subtle smoke char
+        img.setTint(0x786D68); // Subtle smoke char
       }
 
       // Gentle tactile hover lift
       img.on('pointerover', () => {
         this.tweens.add({
           targets: img,
-          y: y - 4,
-          duration: 150,
+          y: y - 5,
+          duration: 160,
           ease: 'Sine.easeOut'
         });
       });
@@ -170,7 +176,7 @@ export class IslandScene extends Phaser.Scene {
         this.tweens.add({
           targets: img,
           y: y,
-          duration: 150,
+          duration: 160,
           ease: 'Sine.easeIn'
         });
       });
@@ -181,21 +187,20 @@ export class IslandScene extends Phaser.Scene {
       const isTarget = activeEvent && activeEvent.targetTile.q === tile.q && activeEvent.targetTile.r === tile.r;
       if (isTarget) {
         const iconKey = activeEvent.eventDef.type === 'CHALLENGE' ? 'icon_fire_alert' : 'icon_festival_alert';
-        alertBadge = this.add.image(x, y - 28, iconKey)
-          .setScale(1.0)
+        alertBadge = this.add.image(x, y - 30, iconKey)
+          .setScale(1.05)
           .setDepth(35);
 
         this.tweens.add({
           targets: alertBadge,
-          y: y - 35,
-          scale: 1.15,
+          y: y - 38,
+          scale: 1.2,
           duration: 600,
           yoyo: true,
           repeat: -1
         });
       }
 
-      // Click handler
       img.on('pointerdown', () => {
         if (isTarget && activeEvent) {
           this.enterEventScene(activeEvent.eventDef.gameplaySceneKey);
@@ -220,7 +225,7 @@ export class IslandScene extends Phaser.Scene {
     for (const slot of availableSlots) {
       const { x, y } = this.hexToScreen(slot.q, slot.r);
       const slotImg = this.add.image(x, y, 'hex_slot_empty')
-        .setAlpha(0.65)
+        .setAlpha(0.6)
         .setInteractive({ useHandCursor: true });
 
       slotImg.on('pointerover', () => {
@@ -228,7 +233,7 @@ export class IslandScene extends Phaser.Scene {
       });
 
       slotImg.on('pointerout', () => {
-        slotImg.setAlpha(0.65);
+        slotImg.setAlpha(0.6);
       });
 
       slotImg.on('pointerdown', () => {
@@ -248,20 +253,20 @@ export class IslandScene extends Phaser.Scene {
       const posA = this.hexToScreen(syn.tileA.q, syn.tileA.r);
       const posB = this.hexToScreen(syn.tileB.q, syn.tileB.r);
 
-      // Soft magical connection arch
-      this.connectionsContainer.lineStyle(2.5, 0xFDE047, 0.85);
+      // Soft glowing resonance arc
+      this.connectionsContainer.lineStyle(2.5, 0xFDE047, 0.9);
       const midX = (posA.x + posB.x) / 2;
-      const midY = (posA.y + posB.y) / 2 - 20;
+      const midY = (posA.y + posB.y) / 2 - 22;
 
       const curve = new Phaser.Curves.QuadraticBezier(
         new Phaser.Math.Vector2(posA.x, posA.y),
         new Phaser.Math.Vector2(midX, midY),
         new Phaser.Math.Vector2(posB.x, posB.y)
       );
-      curve.draw(this.connectionsContainer, 20);
+      curve.draw(this.connectionsContainer, 22);
 
       this.connectionsContainer.fillStyle(0xFFFFFF, 0.95);
-      this.connectionsContainer.fillCircle(midX, midY, 3);
+      this.connectionsContainer.fillCircle(midX, midY, 3.5);
     }
   }
 
@@ -272,7 +277,7 @@ export class IslandScene extends Phaser.Scene {
     this.previewTileContainer = this.add.container(previewX, previewY).setDepth(200);
 
     // Soft diffuse shadow
-    this.previewTileShadow = this.add.ellipse(0, 36, 68, 28, 0x783C50, 0.22);
+    this.previewTileShadow = this.add.ellipse(0, 36, 72, 30, 0x6E3547, 0.24);
     this.previewTileContainer.add(this.previewTileShadow);
 
     const currentTile = this.state.tileSystem.getCurrentTile();
@@ -290,7 +295,6 @@ export class IslandScene extends Phaser.Scene {
       ease: 'Sine.easeInOut'
     });
 
-    // Clicking the preview tile rotates it!
     this.previewTileSprite.on('pointerdown', () => {
       this.handleRotate();
     });
@@ -310,11 +314,9 @@ export class IslandScene extends Phaser.Scene {
     const stackX = width * 0.91;
     const stackY = height * 0.83;
 
-    // 3D Hex Stack Tile Pile
     this.stackSprite = this.add.image(stackX, stackY, 'tile_stack_pile')
       .setDepth(150);
 
-    // White hexagonal count badge "65"
     this.stackBadgeBg = this.add.image(stackX - 38, stackY + 28, 'hex_badge_white')
       .setDepth(160);
 
@@ -327,8 +329,8 @@ export class IslandScene extends Phaser.Scene {
   }
 
   private createMinimalControls(width: number, height: number): void {
-    // 1. Tiny unobtrusive controls hint at bottom center
-    const hintText = this.add.text(width / 2, height - 24, 'R ROTATE  •  CLICK TO PLACE  •  CLICK BUILDINGS TO VISIT HAAT', {
+    // Bottom minimal hint
+    this.add.text(width / 2, height - 24, 'R ROTATE  •  CLICK TO PLACE  •  CLICK BUILDINGS TO VISIT HAAT', {
       fontFamily: 'Plus Jakarta Sans, sans-serif',
       fontSize: '11px',
       fontStyle: 'bold',
@@ -336,13 +338,13 @@ export class IslandScene extends Phaser.Scene {
       letterSpacing: 1.2
     }).setOrigin(0.5).setDepth(100);
 
-    // 2. Minimal Floating Haat & Next Round Action Buttons (Bottom Left)
-    const haatBtn = this.add.circle(44, height - 44, 22, 0xFFFFFF, 0.9)
+    // Minimal Floating Haat & Next Round Action Buttons (Bottom Left)
+    const haatBtn = this.add.circle(44, height - 44, 22, 0xFFFFFF, 0.92)
       .setStrokeStyle(1.5, 0xE5A0BC)
       .setInteractive({ useHandCursor: true })
       .setDepth(200);
 
-    const haatIcon = this.add.text(44, height - 44, '🏪', { fontSize: '18px' })
+    this.add.text(44, height - 44, '🏪', { fontSize: '18px' })
       .setOrigin(0.5).setDepth(201);
 
     haatBtn.on('pointerdown', () => {
@@ -350,12 +352,12 @@ export class IslandScene extends Phaser.Scene {
       this.scene.start('HaatScene');
     });
 
-    const roundBtn = this.add.circle(94, height - 44, 22, 0xFFFFFF, 0.9)
+    const roundBtn = this.add.circle(94, height - 44, 22, 0xFFFFFF, 0.92)
       .setStrokeStyle(1.5, 0xE5A0BC)
       .setInteractive({ useHandCursor: true })
       .setDepth(200);
 
-    const roundIcon = this.add.text(94, height - 44, '⏳', { fontSize: '18px' })
+    this.add.text(94, height - 44, '⏳', { fontSize: '18px' })
       .setOrigin(0.5).setDepth(201);
 
     roundBtn.on('pointerdown', () => {
@@ -377,7 +379,7 @@ export class IslandScene extends Phaser.Scene {
   private createEventAlertPill(width: number): void {
     this.eventPillContainer = this.add.container(width / 2, 85).setDepth(600).setVisible(false);
 
-    const pillBg = this.add.rectangle(0, 0, 360, 36, 0xFFFFFF, 0.95)
+    const pillBg = this.add.rectangle(0, 0, 360, 36, 0xFFFFFF, 0.96)
       .setStrokeStyle(1.5, 0xDC2626)
       .setInteractive({ useHandCursor: true });
     this.eventPillContainer.add(pillBg);
@@ -416,11 +418,37 @@ export class IslandScene extends Phaser.Scene {
     this.renderCulturalConnectionArcs();
   }
 
+  private createAmbientWorldLife(width: number, height: number): void {
+    // Drifting bird silhouettes in the calm negative space
+    for (let i = 0; i < 3; i++) {
+      const bird = this.add.text(
+        Phaser.Math.Between(40, width - 100),
+        Phaser.Math.Between(60, height - 120),
+        '~',
+        {
+          fontSize: '14px',
+          color: 'rgba(255, 255, 255, 0.65)',
+          fontStyle: 'bold'
+        }
+      ).setDepth(3);
+
+      this.birds.push(bird);
+
+      this.tweens.add({
+        targets: bird,
+        x: bird.x + Phaser.Math.Between(100, 200),
+        y: bird.y - Phaser.Math.Between(20, 50),
+        duration: Phaser.Math.Between(12000, 20000),
+        repeat: -1,
+        yoyo: true
+      });
+    }
+  }
+
   private handleRotate(): void {
     const rot = this.state.tileSystem.rotateCurrentTile();
     this.state.soundSystem.playTileRotate();
 
-    // Smooth tactile rotation animation
     this.tweens.add({
       targets: this.previewTileSprite,
       angle: rot,
@@ -431,14 +459,12 @@ export class IslandScene extends Phaser.Scene {
   }
 
   private setupInteractions(): void {
-    // Keyboard 'R' to rotate
     if (this.input.keyboard) {
       this.input.keyboard.on('keydown-R', () => {
         this.handleRotate();
       });
     }
 
-    // Pointer move to preview placement over open slots
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       const hex = this.screenToHex(pointer.x, pointer.y);
       const key = `${hex.q},${hex.r}`;
@@ -471,13 +497,11 @@ export class IslandScene extends Phaser.Scene {
       }
     });
 
-    // Close open landmark card on empty canvas click
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (this.activeLandmarkCard) {
-        // Dismiss card if click is far away
         const cardX = this.activeLandmarkCard.x;
         const cardY = this.activeLandmarkCard.y;
-        if (Phaser.Math.Distance.Between(pointer.x, pointer.y, cardX, cardY) > 130) {
+        if (Phaser.Math.Distance.Between(pointer.x, pointer.y, cardX, cardY) > 140) {
           this.activeLandmarkCard.destroy();
           this.activeLandmarkCard = null;
         }
@@ -499,10 +523,16 @@ export class IslandScene extends Phaser.Scene {
     );
 
     if (placed) {
+      const { x, y } = this.hexToScreen(q, r);
       this.state.soundSystem.playTilePlace();
 
       const match = this.state.tileSystem.evaluateEdgeMatching(q, r, placed.tileDef, rotation);
       this.state.scoringSystem.addEventScore(match.scoreBonus);
+
+      // Perfect 6-Edge Placement or High Match Celebration
+      if (match.matchingEdges >= 4 || match.scoreBonus >= 30) {
+        this.triggerPerfectPlacementCelebration(x, y, match.scoreBonus);
+      }
 
       const prevHarmony = this.state.culturalSystem.getCulturalHarmonyScore();
       this.state.culturalSystem.recalculateSynergies(this.state.tileSystem);
@@ -529,6 +559,40 @@ export class IslandScene extends Phaser.Scene {
       this.ghostTileSprite.setVisible(false);
       this.ghostTileText.setVisible(false);
     }
+  }
+
+  private triggerPerfectPlacementCelebration(x: number, y: number, score: number): void {
+    this.state.soundSystem.playCulturalConnect();
+
+    // Golden connection aura ring
+    const ring = this.add.circle(x, y, 20, 0xFDE047, 0.7)
+      .setDepth(30);
+
+    this.tweens.add({
+      targets: ring,
+      scaleX: 2.2,
+      scaleY: 2.2,
+      alpha: 0,
+      duration: 600,
+      onComplete: () => ring.destroy()
+    });
+
+    // Floating score text
+    const floatScore = this.add.text(x, y - 10, `+${score} Harmony!`, {
+      fontFamily: 'Plus Jakarta Sans',
+      fontSize: '13px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      shadow: { blur: 6, color: '#D97706', fill: true }
+    }).setOrigin(0.5).setDepth(35);
+
+    this.tweens.add({
+      targets: floatScore,
+      y: y - 35,
+      alpha: 0,
+      duration: 800,
+      onComplete: () => floatScore.destroy()
+    });
   }
 
   private showLandmarkInfoCard(tile: PlacedHexTileInstance, x: number, y: number): void {
@@ -564,8 +628,7 @@ export class IslandScene extends Phaser.Scene {
     }).setOrigin(0.5);
     card.add(descText);
 
-    // "Visit Central Haat" button inside card
-    const haatBtn = this.add.rectangle(0, 28, 140, 24, 0xB86D4F)
+    const haatBtn = this.add.rectangle(0, 28, 140, 24, 0xB96D4E)
       .setInteractive({ useHandCursor: true });
     card.add(haatBtn);
 
@@ -587,9 +650,8 @@ export class IslandScene extends Phaser.Scene {
   private enterEventScene(sceneKey: string): void {
     this.state.soundSystem.playAlarm();
 
-    // Smooth camera zoom into the affected building
     this.cameras.main.zoomTo(1.8, 700, 'Cubic.easeInOut');
-    this.cameras.main.fade(700, 232, 168, 194); // Fade to pastel pink
+    this.cameras.main.fade(700, 232, 168, 194);
 
     this.time.delayedCall(750, () => {
       this.scene.start(sceneKey);
