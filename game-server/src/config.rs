@@ -16,7 +16,7 @@ impl Config {
     pub fn from_env() -> Self {
         Self {
             database_url:      env::var("DATABASE_URL")
-                .unwrap_or_else(|_| "postgres://jofrey:jofrey@127.0.0.1:5432/cultural_islands".into()),
+                .unwrap_or_else(|_| "postgres://postgres:postgres@127.0.0.1:5432/cultural_islands".into()),
             db_pool_size:      env::var("DB_POOL_SIZE")
                 .unwrap_or_else(|_| "15".into()).parse().unwrap_or(15),
             http_port:         env::var("HTTP_PORT")

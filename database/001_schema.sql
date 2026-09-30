@@ -1,5 +1,5 @@
 -- Cultural Islands — Complete Schema v1.0
--- psql -U jofrey -d cultural_islands -f database/001_schema.sql
+-- psql -U postgres -d cultural_islands -f database/001_schema.sql
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 

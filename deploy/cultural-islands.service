@@ -5,15 +5,15 @@ Requires=postgresql.service
 
 [Service]
 Type=simple
-User=jofrey
-Group=jofrey
-WorkingDirectory=/opt/CulturalIslands/cultural-islands
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/islandgame
 
 # Load env vars
-EnvironmentFile=/opt/CulturalIslands/cultural-islands/.env
+EnvironmentFile=/opt/islandgame/.env
 
 # Run the compiled binary
-ExecStart=/opt/CulturalIslands/cultural-islands/game-server/target/release/cultural-islands-server
+ExecStart=/opt/islandgame/target/release/cultural-islands-server
 
 Restart=on-failure
 RestartSec=5s

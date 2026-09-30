@@ -60,6 +60,13 @@ async fn main() -> std::io::Result<()> {
             }))
             .wrap(cors)
             .wrap(middleware::Logger::default())
+            // ── Health Check ───────────────────────────────────
+            .route("/health", web::get().to(|| async {
+                actix_web::HttpResponse::Ok().json(serde_json::json!({
+                    "status": "ok",
+                    "service": "cultural-islands"
+                }))
+            }))
             // ── WebSocket ──────────────────────────────────────
             .route("/ws", web::get().to(ws::handler::ws_handler))
             // ── REST API ───────────────────────────────────────
