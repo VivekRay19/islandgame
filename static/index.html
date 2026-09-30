@@ -273,10 +273,32 @@
         }
       });
 
-      var importObject = {
+      var baseImportObject = {
         env: envProxy,
         __wbindgen_placeholder__: wbindgenProxy
       };
+
+      // Catch-all Proxy for the top-level importObject so ANY imported module 
+      // (e.g. __wbindgen_externref_xform__, wbg, env) gets an automatic module stub proxy
+      var importObject = new Proxy(baseImportObject, {
+        get: function (target, moduleName) {
+          if (moduleName in target) return target[moduleName];
+
+          // Create and cache dynamic module stub proxy for unknown modules like __wbindgen_externref_xform__
+          var dynamicModuleProxy = new Proxy({}, {
+            get: function (modTarget, prop) {
+              if (prop in modTarget) return modTarget[prop];
+              return function () {
+                console.warn("[WASM Stub] Called " + String(moduleName) + "." + String(prop), arguments);
+                return 0;
+              };
+            }
+          });
+
+          target[moduleName] = dynamicModuleProxy;
+          return dynamicModuleProxy;
+        }
+      });
 
       function register_plugin(plugin) {
         plugins.push(plugin);
