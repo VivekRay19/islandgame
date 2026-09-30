@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{Utc, Duration};
 use crate::AppState;
-use crate::models::player::{RegisterRequest, LoginRequest, PublicPlayer, Player};
+use crate::models::player::{RegisterRequest, LoginRequest};
 use crate::models::errors::AppError;
 
 #[derive(Debug, Serialize, Deserialize)]

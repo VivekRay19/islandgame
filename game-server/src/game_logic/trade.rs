@@ -1,4 +1,4 @@
-use crate::models::game::{PlayerIsland, Resources};
+use crate::models::game::PlayerIsland;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Trader {

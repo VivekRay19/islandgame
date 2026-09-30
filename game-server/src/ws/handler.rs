@@ -12,7 +12,7 @@ const CLIENT_TIMEOUT:     Duration = Duration::from_secs(60);
 pub async fn ws_handler(
     req:     HttpRequest,
     stream:  web::Payload,
-    state:   web::Data<AppState>,
+    _state:  web::Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let (res, mut session, mut msg_stream) = actix_ws::handle(&req, stream)?;
     let query = req.query_string();

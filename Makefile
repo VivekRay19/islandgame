@@ -8,6 +8,12 @@
 #   make db-setup       - Create and seed PostgreSQL database
 #   make install        - Install and configure systemd service for current user/directory
 
+# Include .env if present and export all variables so cargo/sqlx receives DATABASE_URL
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
+
 SERVICE       ?= cultural-islands
 BINARY        := target/release/$(SERVICE)-server
 CLIENT_DIR    := game-client
@@ -15,11 +21,15 @@ STATIC_DIR    := static
 WASM_TARGET   := wasm32-unknown-unknown
 WASM_BIN      := cultural_islands_client.wasm
 
-# Database connection defaults (override via: make db-setup PGUSER=... PGDATABASE=...)
-PGUSER        ?= postgres
-PGDATABASE    ?= cultural_islands
-PGHOST        ?= 127.0.0.1
-PGPORT        ?= 5432
+# Database connection settings (overridden by .env or CLI args)
+DBP_USER      ?= postgres
+DBP_PASSWORD  ?= postgres
+DBP_HOST      ?= 127.0.0.1
+DBP_PORT      ?= 5432
+DBP_NAME      ?= cultural_islands
+
+DATABASE_URL  ?= postgres://$(DBP_USER):$(DBP_PASSWORD)@$(DBP_HOST):$(DBP_PORT)/$(DBP_NAME)
+export DATABASE_URL
 
 # Systemd deployment detection
 DEPLOY_USER   ?= $(if $(SUDO_USER),$(SUDO_USER),$(shell id -un))
@@ -38,7 +48,7 @@ help:
 	@echo "  make build         Build WASM client and Server release binary"
 	@echo "  make build-client  Build only WASM client and copy to $(STATIC_DIR)/"
 	@echo "  make build-server  Build only Server release binary"
-	@echo "  make db-setup      Create DB, apply schema migrations, and seed data"
+	@echo "  make db-setup      Create DB, configure user password, apply migrations & seed"
 	@echo "  make db-migrate    Apply schema migration (001_schema.sql)"
 	@echo "  make db-seed       Seed initial data (002_seed.sql)"
 	@echo "  make install       Configure and install systemd unit for $(SERVICE)"
@@ -109,11 +119,12 @@ clean:
 health:
 	@curl -s http://127.0.0.1:8067/health | (python3 -m json.tool 2>/dev/null || cat) || echo "Server not reachable"
 
-## Setup database (create DB, run migrations and seed)
+## Setup database (create DB, configure user password, run migrations and seed)
 db-setup:
-	@echo "▶ Setting up database $(PGDATABASE)..."
-	@psql -U $(PGUSER) -h $(PGHOST) -p $(PGPORT) -d postgres -c "CREATE DATABASE $(PGDATABASE);" 2>/dev/null || \
-	 sudo -u postgres psql -c "CREATE DATABASE $(PGDATABASE);" 2>/dev/null || true
+	@echo "▶ Ensuring database $(DBP_NAME) and user $(DBP_USER) exist..."
+	@sudo -u postgres psql -c "DO \$$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$(DBP_USER)') THEN CREATE ROLE $(DBP_USER) LOGIN PASSWORD '$(DBP_PASSWORD)' SUPERUSER; ELSE ALTER USER $(DBP_USER) WITH PASSWORD '$(DBP_PASSWORD)'; END IF; END \$\$;" 2>/dev/null || true
+	@sudo -u postgres psql -c "CREATE DATABASE $(DBP_NAME) OWNER $(DBP_USER);" 2>/dev/null || true
+	@sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $(DBP_NAME) TO $(DBP_USER);" 2>/dev/null || true
 	@$(MAKE) db-migrate
 	@$(MAKE) db-seed
 	@echo "✓ Database setup complete"
@@ -121,14 +132,14 @@ db-setup:
 ## Run database schema migrations
 db-migrate:
 	@echo "▶ Applying schema migrations..."
-	@psql -U $(PGUSER) -h $(PGHOST) -p $(PGPORT) -d $(PGDATABASE) -f database/001_schema.sql 2>/dev/null || \
-	 sudo -u postgres psql -d $(PGDATABASE) -f database/001_schema.sql
+	@PGPASSWORD=$(DBP_PASSWORD) psql -U $(DBP_USER) -h $(DBP_HOST) -p $(DBP_PORT) -d $(DBP_NAME) -f database/001_schema.sql 2>/dev/null || \
+	 sudo -u postgres psql -d $(DBP_NAME) -f database/001_schema.sql
 
 ## Seed database with initial story & seasons
 db-seed:
 	@echo "▶ Seeding initial data..."
-	@psql -U $(PGUSER) -h $(PGHOST) -p $(PGPORT) -d $(PGDATABASE) -f database/002_seed.sql 2>/dev/null || \
-	 sudo -u postgres psql -d $(PGDATABASE) -f database/002_seed.sql
+	@PGPASSWORD=$(DBP_PASSWORD) psql -U $(DBP_USER) -h $(DBP_HOST) -p $(DBP_PORT) -d $(DBP_NAME) -f database/002_seed.sql 2>/dev/null || \
+	 sudo -u postgres psql -d $(DBP_NAME) -f database/002_seed.sql
 
 ## Install systemd unit (first-time setup only, configures user and path automatically)
 install:

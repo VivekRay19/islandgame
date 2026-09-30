@@ -1,4 +1,4 @@
-use crate::models::game::{ActiveEvent, PlayerIsland, Resources};
+use crate::models::game::{ActiveEvent, PlayerIsland};
 use rand::Rng;
 
 #[derive(Debug, Clone)]
