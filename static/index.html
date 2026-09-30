@@ -2,20 +2,25 @@
 <html lang="en">
 
 <head>
+  <!-- Polyfill crypto.randomUUID for HTTP environments and browser extensions before any scripts execute -->
   <script>
-    // Universal crypto.randomUUID fallback for HTTP/Extensions
-    if (typeof window.crypto === 'undefined') window.crypto = {};
-    if (typeof window.crypto.randomUUID !== 'function') {
-      window.crypto.randomUUID = function () {
-        return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, function (c) {
-          return (c ^ (Math.random() * 16 >> (c / 4))).toString(16);
-        });
-      };
-    }
+    (function () {
+      if (typeof window !== 'undefined') {
+        if (!window.crypto) window.crypto = {};
+        if (typeof window.crypto.randomUUID !== 'function') {
+          window.crypto.randomUUID = function randomUUID() {
+            return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, function (c) {
+              return (c ^ (Math.random() * 16 >> (c / 4))).toString(16);
+            });
+          };
+        }
+      }
+    })();
   </script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Island Game</title>
+
   <style>
     html,
     body {
@@ -24,7 +29,9 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #000;
+      background-color: #0d1117;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #f0f6fc;
     }
 
     #glcanvas {
@@ -32,16 +39,263 @@
       height: 100%;
       display: block;
     }
+
+    #status-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      background: rgba(22, 27, 34, 0.9);
+      backdrop-filter: blur(8px);
+      padding: 28px 36px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      max-width: 85%;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      transition: opacity 0.3s ease;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .spinner {
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      border-top: 3px solid #58a6ff;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px auto;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .error-title {
+      color: #f85149;
+      font-weight: 600;
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+    }
+
+    .error-desc {
+      font-size: 0.9rem;
+      color: #8b949e;
+      line-height: 1.4;
+    }
   </style>
 </head>
 
 <body>
   <canvas id="glcanvas"></canvas>
 
-  <!-- Load Miniquad JS Glue & Launch WASM -->
-  <script src="static/mq_js_bundle.js"></script>
+  <div id="status-overlay">
+    <div id="spinner" class="spinner"></div>
+    <div id="status-title" style="font-weight: 500;">Loading Cultural Islands...</div>
+    <div id="status-desc" class="error-desc" style="margin-top: 6px;">Initializing WebGL engine & WASM modules</div>
+  </div>
+
   <script>
-    load("cultural_islands_client.wasm");
+    (function () {
+      'use strict';
+
+      var MINIQUAD_VERSION = 196624;
+      var canvas = null;
+      var gl = null;
+      var wasm_exports = null;
+      var plugins = [];
+
+      function showStatusError(title, desc) {
+        var overlay = document.getElementById("status-overlay");
+        var spinner = document.getElementById("spinner");
+        var titleEl = document.getElementById("status-title");
+        var descEl = document.getElementById("status-desc");
+        if (spinner) spinner.style.display = "none";
+        if (titleEl) {
+          titleEl.className = "error-title";
+          titleEl.innerText = title;
+        }
+        if (descEl) descEl.innerText = desc;
+        if (overlay) overlay.classList.remove("hidden");
+      }
+
+      function hideStatusOverlay() {
+        var overlay = document.getElementById("status-overlay");
+        if (overlay) overlay.classList.add("hidden");
+      }
+
+      function get_gl_context() {
+        if (gl) return gl;
+
+        if (!canvas) {
+          canvas = document.getElementById("glcanvas") || document.querySelector("canvas");
+        }
+
+        if (!canvas) return null;
+
+        var params = {
+          alpha: false,
+          antiAlias: false,
+          depth: true,
+          stencil: true,
+          premultipliedAlpha: false,
+          preserveDrawingBuffer: false,
+          powerPreference: "high-performance"
+        };
+
+        try {
+          gl = canvas.getContext("webgl2", params) ||
+            canvas.getContext("webgl", params) ||
+            canvas.getContext("experimental-webgl", params);
+        } catch (e) {
+          console.error("[Miniquad JS] Failed to acquire WebGL context:", e);
+        }
+
+        if (gl) {
+          window.gl = gl;
+        } else {
+          console.error("[Miniquad JS] WebGL is not supported or disabled in this browser.");
+          showStatusError("WebGL Not Supported", "Your browser or device context does not support WebGL hardware acceleration.");
+        }
+
+        return gl;
+      }
+
+      var importObject = {
+        env: {
+          console_log: function (ptr, len) {
+            if (!wasm_exports || !wasm_exports.memory) return;
+            var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
+            console.log(new TextDecoder("utf-8").decode(bytes));
+          },
+          console_info: function (ptr, len) {
+            if (!wasm_exports || !wasm_exports.memory) return;
+            var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
+            console.info(new TextDecoder("utf-8").decode(bytes));
+          },
+          console_warn: function (ptr, len) {
+            if (!wasm_exports || !wasm_exports.memory) return;
+            var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
+            console.warn(new TextDecoder("utf-8").decode(bytes));
+          },
+          console_error: function (ptr, len) {
+            if (!wasm_exports || !wasm_exports.memory) return;
+            var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
+            console.error(new TextDecoder("utf-8").decode(bytes));
+          },
+          miniquad_version: function () {
+            return MINIQUAD_VERSION;
+          },
+          _webglGet: function (pname) {
+            var ctx = get_gl_context();
+            if (!ctx) return 0;
+            try {
+              var val = ctx.getParameter(pname);
+              if (typeof val === 'number') return val;
+              if (typeof val === 'boolean') return val ? 1 : 0;
+            } catch (e) {
+              console.warn("[Miniquad JS] _webglGet failed for pname:", pname, e);
+            }
+            return 0;
+          },
+          glGetIntegerv: function (pname, params_ptr) {
+            var ctx = get_gl_context();
+            if (!ctx || !wasm_exports || !wasm_exports.memory) return;
+            try {
+              var val = ctx.getParameter(pname);
+              var view = new Int32Array(wasm_exports.memory.buffer, params_ptr, 1);
+              if (typeof val === 'number') {
+                view[0] = val;
+              } else if (typeof val === 'boolean') {
+                view[0] = val ? 1 : 0;
+              }
+            } catch (e) {
+              console.warn("[Miniquad JS] glGetIntegerv failed for pname:", pname, e);
+            }
+          }
+        }
+      };
+
+      function register_plugin(plugin) {
+        plugins.push(plugin);
+        if (plugin.register_plugin) {
+          plugin.register_plugin(importObject);
+        }
+      }
+
+      window.miniquad_add_plugin = register_plugin;
+
+      window.load = function (wasm_path) {
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", function () {
+            window.load(wasm_path);
+          });
+          return;
+        }
+
+        get_gl_context();
+
+        fetch(wasm_path)
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error("HTTP " + response.status + " (" + response.statusText + ") - Target file '" + wasm_path + "' not found.");
+            }
+            return response.arrayBuffer();
+          })
+          .then(function (bytes) {
+            return WebAssembly.instantiate(bytes, importObject);
+          })
+          .then(function (results) {
+            wasm_exports = results.instance.exports;
+
+            plugins.forEach(function (plugin) {
+              if (plugin.on_init) plugin.on_init(wasm_exports);
+            });
+
+            function resize() {
+              if (!canvas) canvas = document.getElementById("glcanvas") || document.querySelector("canvas");
+              if (!canvas) return;
+
+              canvas.width = window.innerWidth * (window.devicePixelRatio || 1);
+              canvas.height = window.innerHeight * (window.devicePixelRatio || 1);
+
+              var ctx = get_gl_context();
+              if (ctx) {
+                ctx.viewport(0, 0, canvas.width, canvas.height);
+              }
+            }
+
+            window.addEventListener('resize', resize);
+            resize();
+
+            hideStatusOverlay();
+
+            if (wasm_exports.main) {
+              wasm_exports.main();
+            } else if (wasm_exports._start) {
+              wasm_exports._start();
+            } else {
+              console.error("[Miniquad JS] Neither main() nor _start() exported in WASM!");
+              showStatusError("Execution Error", "No main entry point found in the loaded WASM binary.");
+            }
+          })
+          .catch(function (err) {
+            console.error("[Miniquad JS] Error loading WASM binary:", err);
+            showStatusError("WASM Binary Load Failed", err.message + ". Ensure 'cultural_islands_client.wasm' is present in the web root directory.");
+          });
+      };
+    })();
+
+    window.load("cultural_islands_client.wasm");
   </script>
 </body>
 
