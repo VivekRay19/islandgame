@@ -4,20 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cultural Islands: Island Haat</title>
-  <!-- Polyfill for crypto.randomUUID on non-HTTPS / HTTP IP environments -->
-  <script>
-    if (!window.crypto) {
-      window.crypto = {};
-    }
-    if (!window.crypto.randomUUID) {
-      window.crypto.randomUUID = function () {
-        return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, function (c) {
-          var r = crypto.getRandomValues ? crypto.getRandomValues(new Uint8Array(1))[0] : Math.floor(Math.random() * 256);
-          return (c ^ (r & (15 >> (c / 4)))).toString(16);
-        });
-      };
-    }
-  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">

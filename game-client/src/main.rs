@@ -23,9 +23,7 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     #[cfg(target_arch = "wasm32")]
-    std::panic::set_hook(Box::new(|info| {
-        macroquad::logging::error!("{}", info);
-    }));
+    console_error_panic_hook::set_once();
 
     let mut app = App::new();
     loop {
