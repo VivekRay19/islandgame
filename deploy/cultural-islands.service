@@ -1,0 +1,27 @@
+[Unit]
+Description=Cultural Islands — Island Development & Survival Game Server
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=jofrey
+Group=jofrey
+WorkingDirectory=/opt/CulturalIslands/cultural-islands
+
+# Load env vars
+EnvironmentFile=/opt/CulturalIslands/cultural-islands/.env
+
+# Run the compiled binary
+ExecStart=/opt/CulturalIslands/cultural-islands/game-server/target/release/cultural-islands-server
+
+Restart=on-failure
+RestartSec=5s
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
