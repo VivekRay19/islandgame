@@ -19,7 +19,7 @@
   </script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Island Game</title>
+  <title>Cultural Islands</title>
 
   <style>
     html,
@@ -38,6 +38,7 @@
       width: 100%;
       height: 100%;
       display: block;
+      touch-action: none;
     }
 
     #status-overlay {
@@ -46,7 +47,7 @@
       left: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
-      background: rgba(22, 27, 34, 0.9);
+      background: rgba(22, 27, 34, 0.92);
       backdrop-filter: blur(8px);
       padding: 28px 36px;
       border-radius: 12px;
@@ -54,6 +55,7 @@
       max-width: 85%;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
       transition: opacity 0.3s ease;
+      z-index: 9999;
     }
 
     .hidden {
@@ -91,6 +93,7 @@
       font-size: 0.9rem;
       color: #8b949e;
       line-height: 1.4;
+      word-break: break-word;
     }
   </style>
 </head>
@@ -101,7 +104,7 @@
   <div id="status-overlay">
     <div id="spinner" class="spinner"></div>
     <div id="status-title" style="font-weight: 500;">Loading Cultural Islands...</div>
-    <div id="status-desc" class="error-desc" style="margin-top: 6px;">Initializing WebGL engine & WASM modules</div>
+    <div id="status-desc" class="error-desc" style="margin-top: 6px;">Initializing WebGL engine & WASM bindings</div>
   </div>
 
   <script>
@@ -170,59 +173,109 @@
         return gl;
       }
 
-      var importObject = {
-        env: {
-          console_log: function (ptr, len) {
-            if (!wasm_exports || !wasm_exports.memory) return;
-            var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
-            console.log(new TextDecoder("utf-8").decode(bytes));
-          },
-          console_info: function (ptr, len) {
-            if (!wasm_exports || !wasm_exports.memory) return;
-            var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
-            console.info(new TextDecoder("utf-8").decode(bytes));
-          },
-          console_warn: function (ptr, len) {
-            if (!wasm_exports || !wasm_exports.memory) return;
-            var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
-            console.warn(new TextDecoder("utf-8").decode(bytes));
-          },
-          console_error: function (ptr, len) {
-            if (!wasm_exports || !wasm_exports.memory) return;
-            var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
-            console.error(new TextDecoder("utf-8").decode(bytes));
-          },
-          miniquad_version: function () {
-            return MINIQUAD_VERSION;
-          },
-          _webglGet: function (pname) {
-            var ctx = get_gl_context();
-            if (!ctx) return 0;
-            try {
-              var val = ctx.getParameter(pname);
-              if (typeof val === 'number') return val;
-              if (typeof val === 'boolean') return val ? 1 : 0;
-            } catch (e) {
-              console.warn("[Miniquad JS] _webglGet failed for pname:", pname, e);
+      var baseEnv = {
+        console_log: function (ptr, len) {
+          if (!wasm_exports || !wasm_exports.memory) return;
+          var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
+          console.log(new TextDecoder("utf-8").decode(bytes));
+        },
+        console_info: function (ptr, len) {
+          if (!wasm_exports || !wasm_exports.memory) return;
+          var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
+          console.info(new TextDecoder("utf-8").decode(bytes));
+        },
+        console_warn: function (ptr, len) {
+          if (!wasm_exports || !wasm_exports.memory) return;
+          var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
+          console.warn(new TextDecoder("utf-8").decode(bytes));
+        },
+        console_error: function (ptr, len) {
+          if (!wasm_exports || !wasm_exports.memory) return;
+          var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
+          console.error(new TextDecoder("utf-8").decode(bytes));
+        },
+        miniquad_version: function () {
+          return MINIQUAD_VERSION;
+        },
+        _webglGet: function (pname) {
+          var ctx = get_gl_context();
+          if (!ctx) return 0;
+          try {
+            var val = ctx.getParameter(pname);
+            if (typeof val === 'number') return val;
+            if (typeof val === 'boolean') return val ? 1 : 0;
+          } catch (e) {
+            console.warn("[Miniquad JS] _webglGet failed for pname:", pname, e);
+          }
+          return 0;
+        },
+        glGetIntegerv: function (pname, params_ptr) {
+          var ctx = get_gl_context();
+          if (!ctx || !wasm_exports || !wasm_exports.memory) return;
+          try {
+            var val = ctx.getParameter(pname);
+            var view = new Int32Array(wasm_exports.memory.buffer, params_ptr, 1);
+            if (typeof val === 'number') {
+              view[0] = val;
+            } else if (typeof val === 'boolean') {
+              view[0] = val ? 1 : 0;
             }
-            return 0;
-          },
-          glGetIntegerv: function (pname, params_ptr) {
-            var ctx = get_gl_context();
-            if (!ctx || !wasm_exports || !wasm_exports.memory) return;
-            try {
-              var val = ctx.getParameter(pname);
-              var view = new Int32Array(wasm_exports.memory.buffer, params_ptr, 1);
-              if (typeof val === 'number') {
-                view[0] = val;
-              } else if (typeof val === 'boolean') {
-                view[0] = val ? 1 : 0;
-              }
-            } catch (e) {
-              console.warn("[Miniquad JS] glGetIntegerv failed for pname:", pname, e);
-            }
+          } catch (e) {
+            console.warn("[Miniquad JS] glGetIntegerv failed for pname:", pname, e);
           }
         }
+      };
+
+      // Dynamic Proxy for env to catch unhandled C/Rust miniquad imports
+      var envProxy = new Proxy(baseEnv, {
+        get: function (target, prop) {
+          if (prop in target) return target[prop];
+          return function () {
+            console.warn("[Miniquad Stub] Called unhandled env function: " + String(prop), arguments);
+            return 0;
+          };
+        }
+      });
+
+      // Standard wasm-bindgen stubs
+      var wbindgenStubs = {
+        __wbindgen_describe: function () { },
+        __wbindgen_throw: function (ptr, len) {
+          var msg = "WASM Panic";
+          if (wasm_exports && wasm_exports.memory) {
+            var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
+            msg = new TextDecoder("utf-8").decode(bytes);
+          }
+          console.error("[wasm-bindgen panic]", msg);
+          showStatusError("WASM Application Panic", msg);
+          throw new Error(msg);
+        },
+        __wbindgen_object_drop_ref: function () { },
+        __wbindgen_object_clone_ref: function () { return 0; },
+        __wbindgen_cb_drop: function () { return true; },
+        __wbindgen_number_get: function () { return 0; },
+        __wbindgen_is_undefined: function () { return true; },
+        __wbindgen_is_null: function () { return false; },
+        __wbindgen_is_f64: function () { return false; },
+        __wbindgen_is_string: function () { return false; },
+        __wbindgen_string_new: function () { return 0; },
+        __wbindgen_string_get: function () { return 0; }
+      };
+
+      // Dynamic Proxy for __wbindgen_placeholder__ so missing wasm-bindgen imports never crash WebAssembly.instantiate
+      var wbindgenProxy = new Proxy(wbindgenStubs, {
+        get: function (target, prop) {
+          if (prop in target) return target[prop];
+          return function () {
+            console.warn("[wasm-bindgen stub] Called __wbindgen_placeholder__." + String(prop), arguments);
+            return 0;
+          };
+        }
+      });
+
+      var importObject = {
+        env: envProxy,
+        __wbindgen_placeholder__: wbindgenProxy
       };
 
       function register_plugin(plugin) {
@@ -234,6 +287,28 @@
 
       window.miniquad_add_plugin = register_plugin;
 
+      function fetchWasmBinary(paths, index, resolve, reject) {
+        if (index >= paths.length) {
+          reject(new Error("Could not find WASM binary at any expected locations: " + paths.join(", ")));
+          return;
+        }
+
+        var currentPath = paths[index];
+        fetch(currentPath)
+          .then(function (response) {
+            if (response.ok) {
+              return response.arrayBuffer();
+            }
+            throw new Error("HTTP " + response.status);
+          })
+          .then(function (bytes) {
+            resolve({ bytes: bytes, path: currentPath });
+          })
+          .catch(function () {
+            fetchWasmBinary(paths, index + 1, resolve, reject);
+          });
+      }
+
       window.load = function (wasm_path) {
         if (document.readyState === "loading") {
           document.addEventListener("DOMContentLoaded", function () {
@@ -244,15 +319,19 @@
 
         get_gl_context();
 
-        fetch(wasm_path)
-          .then(function (response) {
-            if (!response.ok) {
-              throw new Error("HTTP " + response.status + " (" + response.statusText + ") - Target file '" + wasm_path + "' not found.");
-            }
-            return response.arrayBuffer();
-          })
-          .then(function (bytes) {
-            return WebAssembly.instantiate(bytes, importObject);
+        var candidatePaths = [
+          wasm_path,
+          "cultural_islands_client.wasm",
+          "static/cultural_islands_client.wasm",
+          "/static/cultural_islands_client.wasm",
+          "/cultural_islands_client.wasm"
+        ];
+
+        new Promise(function (resolve, reject) {
+          fetchWasmBinary(candidatePaths, 0, resolve, reject);
+        })
+          .then(function (result) {
+            return WebAssembly.instantiate(result.bytes, importObject);
           })
           .then(function (results) {
             wasm_exports = results.instance.exports;
@@ -290,7 +369,7 @@
           })
           .catch(function (err) {
             console.error("[Miniquad JS] Error loading WASM binary:", err);
-            showStatusError("WASM Binary Load Failed", err.message + ". Ensure 'cultural_islands_client.wasm' is present in the web root directory.");
+            showStatusError("WASM Binary Load Failed", err.message);
           });
       };
     })();
