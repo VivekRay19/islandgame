@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use actix_web::{web, App, HttpServer, middleware};
 use actix_files as fs;
 use actix_cors::Cors;
