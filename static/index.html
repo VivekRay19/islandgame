@@ -80,6 +80,16 @@
       image-rendering: crisp-edges;
     }
   </style>
+  <!-- Polyfill crypto.randomUUID for insecure/LAN HTTP contexts (stops browser extensions from crashing) -->
+  <script>
+    if (typeof crypto !== 'undefined' && !crypto.randomUUID) {
+      crypto.randomUUID = function() {
+        return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, function(c) {
+          return (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16);
+        });
+      };
+    }
+  </script>
 </head>
 <body>
   <!-- Splash screen shown while WASM loads -->
@@ -102,37 +112,42 @@
   <script src="mq_js_bundle.js"></script>
   <script src="quad-net.js"></script>
   <script>
-    const splash = document.getElementById('loading-screen');
-    const canvas = document.getElementById('glcanvas');
+    (function () {
+      const splash = document.getElementById('loading-screen');
+      const glCanvas = document.getElementById('glcanvas');
 
-    window.addEventListener('error', function(e) {
-      console.error("Game Client Error:", e.error || e.message);
-    });
+      window.addEventListener('error', function(e) {
+        console.error("Game Client Error:", e.error || e.message);
+      });
 
-    function hideSplash() {
-      if (splash && !splash.classList.contains('hidden')) {
-        splash.classList.add('hidden');
-        setTimeout(() => { splash.style.display = 'none'; }, 500);
+      function hideSplash() {
+        if (splash && !splash.classList.contains('hidden')) {
+          splash.classList.add('hidden');
+          setTimeout(() => { splash.style.display = 'none'; }, 500);
+        }
       }
-    }
 
-    load("cultural_islands_client.wasm");
+      // Start the Macroquad WASM client
+      load("cultural_islands_client.wasm");
 
-    // Hide splash as soon as miniquad initial frame runs, with a 2.5s fallback
-    let elapsed = 0;
-    const check = setInterval(() => {
-      elapsed += 100;
-      if (canvas && (canvas.width > 0 || canvas.clientWidth > 0) && elapsed >= 400) {
-        clearInterval(check);
-        hideSplash();
-      } else if (elapsed >= 2500) {
-        clearInterval(check);
-        hideSplash();
+      // Hide splash as soon as miniquad initial frame runs, with fallback
+      let elapsed = 0;
+      const check = setInterval(() => {
+        elapsed += 100;
+        if (glCanvas && (glCanvas.width > 0 || glCanvas.clientWidth > 0) && elapsed >= 400) {
+          clearInterval(check);
+          hideSplash();
+        } else if (elapsed >= 3000) {
+          clearInterval(check);
+          hideSplash();
+        }
+      }, 100);
+
+      document.addEventListener('contextmenu', e => e.preventDefault());
+      if (glCanvas) {
+        glCanvas.focus();
       }
-    }, 100);
-
-    document.addEventListener('contextmenu', e => e.preventDefault());
-    canvas.focus();
+    })();
   </script>
 </body>
 </html>
