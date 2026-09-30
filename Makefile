@@ -123,27 +123,41 @@ clean:
 health:
 	@curl -s http://127.0.0.1:8067/health | (python3 -m json.tool 2>/dev/null || cat) || echo "Server not reachable"
 
-## Setup database (create DB, configure user password, run migrations and seed)
+## Setup database (creates user with password and database from DATABASE_URL, runs schema and seed)
 db-setup:
-	@echo "▶ Ensuring database $(DBP_NAME) and user $(DBP_USER) exist..."
-	@sudo -u postgres psql -c "DO \$$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$(DBP_USER)') THEN CREATE ROLE $(DBP_USER) LOGIN PASSWORD '$(DBP_PASSWORD)' SUPERUSER; ELSE ALTER USER $(DBP_USER) WITH PASSWORD '$(DBP_PASSWORD)'; END IF; END \$\$;" 2>/dev/null || true
-	@sudo -u postgres psql -c "CREATE DATABASE $(DBP_NAME) OWNER $(DBP_USER);" 2>/dev/null || true
-	@sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $(DBP_NAME) TO $(DBP_USER);" 2>/dev/null || true
-	@$(MAKE) db-migrate
-	@$(MAKE) db-seed
-	@echo "✓ Database setup complete"
+	@echo "▶ Reading database configuration from DATABASE_URL..."
+	@DB_USER=$$(echo "$$DATABASE_URL" | sed -E 's|.*://([^:]+):.*|\1|'); \
+	 DB_PASS=$$(echo "$$DATABASE_URL" | sed -E 's|.*://[^:]+:([^@]+)@.*|\1|'); \
+	 DB_HOST=$$(echo "$$DATABASE_URL" | sed -E 's|.*@([^:/]+).*|\1|'); \
+	 DB_PORT=$$(echo "$$DATABASE_URL" | sed -E 's|.*:([0-9]+)/.*|\1|'); \
+	 DB_NAME=$$(echo "$$DATABASE_URL" | sed -E 's|.*/([^?]+).*|\1|'); \
+	 echo "▶ Configuring PostgreSQL user '$$DB_USER' and database '$$DB_NAME'..."; \
+	 sudo -u postgres psql -c "DO \$$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$$DB_USER') THEN CREATE ROLE $$DB_USER LOGIN PASSWORD '$$DB_PASS' SUPERUSER; ELSE ALTER USER $$DB_USER WITH PASSWORD '$$DB_PASS'; END IF; END \$\$;"; \
+	 sudo -u postgres psql -c "CREATE DATABASE $$DB_NAME OWNER $$DB_USER;" 2>/dev/null || true; \
+	 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $$DB_NAME TO $$DB_USER;"; \
+	 echo "▶ Applying schema migrations (001_schema.sql)..."; \
+	 PGPASSWORD="$$DB_PASS" psql -U "$$DB_USER" -h "$$DB_HOST" -p "$$DB_PORT" -d "$$DB_NAME" -f database/001_schema.sql 2>/dev/null || \
+	 sudo -u postgres psql -d "$$DB_NAME" -f database/001_schema.sql; \
+	 echo "▶ Seeding initial data (002_seed.sql)..."; \
+	 PGPASSWORD="$$DB_PASS" psql -U "$$DB_USER" -h "$$DB_HOST" -p "$$DB_PORT" -d "$$DB_NAME" -f database/002_seed.sql 2>/dev/null || \
+	 sudo -u postgres psql -d "$$DB_NAME" -f database/002_seed.sql; \
+	 echo "✓ Database setup complete for '$$DB_USER' on '$$DB_NAME'"
 
 ## Run database schema migrations
 db-migrate:
-	@echo "▶ Applying schema migrations..."
-	@PGPASSWORD=$(DBP_PASSWORD) psql -U $(DBP_USER) -h $(DBP_HOST) -p $(DBP_PORT) -d $(DBP_NAME) -f database/001_schema.sql 2>/dev/null || \
-	 sudo -u postgres psql -d $(DBP_NAME) -f database/001_schema.sql
+	@DB_USER=$$(echo "$$DATABASE_URL" | sed -E 's|.*://([^:]+):.*|\1|'); \
+	 DB_PASS=$$(echo "$$DATABASE_URL" | sed -E 's|.*://[^:]+:([^@]+)@.*|\1|'); \
+	 DB_NAME=$$(echo "$$DATABASE_URL" | sed -E 's|.*/([^?]+).*|\1|'); \
+	 PGPASSWORD="$$DB_PASS" psql -U "$$DB_USER" -d "$$DB_NAME" -f database/001_schema.sql 2>/dev/null || \
+	 sudo -u postgres psql -d "$$DB_NAME" -f database/001_schema.sql
 
 ## Seed database with initial story & seasons
 db-seed:
-	@echo "▶ Seeding initial data..."
-	@PGPASSWORD=$(DBP_PASSWORD) psql -U $(DBP_USER) -h $(DBP_HOST) -p $(DBP_PORT) -d $(DBP_NAME) -f database/002_seed.sql 2>/dev/null || \
-	 sudo -u postgres psql -d $(DBP_NAME) -f database/002_seed.sql
+	@DB_USER=$$(echo "$$DATABASE_URL" | sed -E 's|.*://([^:]+):.*|\1|'); \
+	 DB_PASS=$$(echo "$$DATABASE_URL" | sed -E 's|.*://[^:]+:([^@]+)@.*|\1|'); \
+	 DB_NAME=$$(echo "$$DATABASE_URL" | sed -E 's|.*/([^?]+).*|\1|'); \
+	 PGPASSWORD="$$DB_PASS" psql -U "$$DB_USER" -d "$$DB_NAME" -f database/002_seed.sql 2>/dev/null || \
+	 sudo -u postgres psql -d "$$DB_NAME" -f database/002_seed.sql
 
 ## Install systemd unit (first-time setup only, configures user and path automatically)
 install:
