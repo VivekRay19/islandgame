@@ -2,8 +2,8 @@
 <html lang="en">
 
 <head>
-  <!-- Polyfill crypto.randomUUID for HTTP environments and browser extensions before any scripts execute -->
   <script>
+    // Polyfill crypto.randomUUID for non-HTTPS / non-secure context compatibility
     (function () {
       if (typeof window !== 'undefined') {
         if (!window.crypto) window.crypto = {};
@@ -226,7 +226,6 @@
         }
       };
 
-      // Dynamic Proxy for env to catch unhandled C/Rust miniquad imports
       var envProxy = new Proxy(baseEnv, {
         get: function (target, prop) {
           if (prop in target) return target[prop];
@@ -237,7 +236,6 @@
         }
       });
 
-      // Standard wasm-bindgen stubs
       var wbindgenStubs = {
         __wbindgen_describe: function () { },
         __wbindgen_throw: function (ptr, len) {
@@ -262,7 +260,6 @@
         __wbindgen_string_get: function () { return 0; }
       };
 
-      // Dynamic Proxy for __wbindgen_placeholder__ so missing wasm-bindgen imports never crash WebAssembly.instantiate
       var wbindgenProxy = new Proxy(wbindgenStubs, {
         get: function (target, prop) {
           if (prop in target) return target[prop];
@@ -278,13 +275,10 @@
         __wbindgen_placeholder__: wbindgenProxy
       };
 
-      // Catch-all Proxy for the top-level importObject so ANY imported module 
-      // (e.g. __wbindgen_externref_xform__, wbg, env) gets an automatic module stub proxy
       var importObject = new Proxy(baseImportObject, {
         get: function (target, moduleName) {
           if (moduleName in target) return target[moduleName];
 
-          // Create and cache dynamic module stub proxy for unknown modules like __wbindgen_externref_xform__
           var dynamicModuleProxy = new Proxy({}, {
             get: function (modTarget, prop) {
               if (prop in modTarget) return modTarget[prop];
@@ -308,6 +302,16 @@
       }
 
       window.miniquad_add_plugin = register_plugin;
+
+      function loadScript(src) {
+        return new Promise(function (resolve) {
+          var script = document.createElement("script");
+          script.src = src;
+          script.onload = function () { resolve(true); };
+          script.onerror = function () { resolve(false); };
+          document.head.appendChild(script);
+        });
+      }
 
       function fetchWasmBinary(paths, index, resolve, reject) {
         if (index >= paths.length) {
@@ -341,16 +345,22 @@
 
         get_gl_context();
 
-        var candidatePaths = [
-          wasm_path,
-          "cultural_islands_client.wasm",
-          "static/cultural_islands_client.wasm",
-          "/static/cultural_islands_client.wasm",
-          "/cultural_islands_client.wasm"
-        ];
+        // Dynamically try loading helper plugin scripts first
+        Promise.all([
+          loadScript("quad-net.js").then(function (ok) { if (!ok) return loadScript("static/quad-net.js"); }),
+          loadScript("mq_js_bundle.js").then(function (ok) { if (!ok) return loadScript("static/mq_js_bundle.js"); })
+        ]).then(function () {
+          var candidatePaths = [
+            wasm_path,
+            "cultural_islands_client.wasm",
+            "static/cultural_islands_client.wasm",
+            "/static/cultural_islands_client.wasm",
+            "/cultural_islands_client.wasm"
+          ];
 
-        new Promise(function (resolve, reject) {
-          fetchWasmBinary(candidatePaths, 0, resolve, reject);
+          return new Promise(function (resolve, reject) {
+            fetchWasmBinary(candidatePaths, 0, resolve, reject);
+          });
         })
           .then(function (result) {
             return WebAssembly.instantiate(result.bytes, importObject);
