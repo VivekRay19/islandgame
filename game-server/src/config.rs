@@ -26,7 +26,7 @@ impl Config {
             host:              env::var("HOST").unwrap_or_else(|_| "0.0.0.0".into()),
             static_dir:        env::var("STATIC_DIR").unwrap_or_else(|_| "./static".into()),
             jwt_secret:        env::var("JWT_SECRET")
-                .unwrap_or_else(|_| "cultural_islands_dev_secret".into()),
+                .unwrap_or_else(|_| "3c8988e8bdec4318a63224737b38371f9b8e1ab090044eb68f9128783cbecf5d".into()),
             jwt_expires_hours: env::var("JWT_EXPIRES_HOURS")
                 .unwrap_or_else(|_| "72".into()).parse().unwrap_or(72),
         }

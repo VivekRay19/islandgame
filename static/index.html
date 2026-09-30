@@ -97,35 +97,42 @@
   </div>
 
   <!-- Macroquad renders here -->
-  <canvas id="glcanvas" tabindex="1"></canvas>
+  <canvas id="glcanvas" tabindex="1" width="1280" height="720"></canvas>
 
-  <!--
-    mq_js_bundle.js is Macroquad's WASM JavaScript glue.
-    Download it ONCE and place it next to index.html:
-      curl -o static/mq_js_bundle.js \
-        https://not-fl3.github.io/miniquad-samples/mq_js_bundle.js
-  -->
   <script src="mq_js_bundle.js"></script>
+  <script src="quad-net.js"></script>
   <script>
-    // Hide splash when WASM is ready
     const splash = document.getElementById('loading-screen');
-    const original_load = window.load;
+    const canvas = document.getElementById('glcanvas');
+
+    window.addEventListener('error', function(e) {
+      console.error("Game Client Error:", e.error || e.message);
+    });
+
+    function hideSplash() {
+      if (splash && !splash.classList.contains('hidden')) {
+        splash.classList.add('hidden');
+        setTimeout(() => { splash.style.display = 'none'; }, 500);
+      }
+    }
 
     load("cultural_islands_client.wasm");
 
-    // Poll until miniquad is running
+    // Hide splash as soon as miniquad initial frame runs, with a 2.5s fallback
+    let elapsed = 0;
     const check = setInterval(() => {
-      const canvas = document.getElementById('glcanvas');
-      if (canvas && canvas.width > 0) {
+      elapsed += 100;
+      if (canvas && (canvas.width > 0 || canvas.clientWidth > 0) && elapsed >= 400) {
         clearInterval(check);
-        setTimeout(() => splash.classList.add('hidden'), 400);
+        hideSplash();
+      } else if (elapsed >= 2500) {
+        clearInterval(check);
+        hideSplash();
       }
-    }, 200);
+    }, 100);
 
-    // Prevent context menu on right click
     document.addEventListener('contextmenu', e => e.preventDefault());
-    // Focus canvas for keyboard input
-    document.getElementById('glcanvas').focus();
+    canvas.focus();
   </script>
 </body>
 </html>
