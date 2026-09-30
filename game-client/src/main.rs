@@ -1,4 +1,5 @@
 //! Cultural Islands — Macroquad WASM client entry point
+#![allow(dead_code)]
 use macroquad::prelude::*;
 mod types;
 mod network;

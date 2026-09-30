@@ -22,8 +22,8 @@ WASM_TARGET   := wasm32-unknown-unknown
 WASM_BIN      := cultural_islands_client.wasm
 
 # Database connection settings (overridden by .env or CLI args)
-DBP_USER      ?= postgres
-DBP_PASSWORD  ?= postgres
+DBP_USER      ?= jofrey
+DBP_PASSWORD  ?= 2025
 DBP_HOST      ?= 127.0.0.1
 DBP_PORT      ?= 5432
 DBP_NAME      ?= cultural_islands
@@ -81,8 +81,12 @@ build-client:
 
 ## Build server release binary
 build-server:
+	@if [ ! -f .env ]; then \
+		echo "▶ Creating .env from .env.example..."; \
+		cp .env.example .env; \
+	fi
 	@echo "▶ Building server (release)..."
-	cargo build --release -p $(SERVICE)-server
+	DATABASE_URL="$(DATABASE_URL)" cargo build --release -p $(SERVICE)-server
 	@echo "✓ Server binary ready at $(BINARY)"
 
 ## Start systemd service
