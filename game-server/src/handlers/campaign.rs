@@ -106,8 +106,8 @@ pub async fn make_choice(
                story_flags = story_flags || $2::jsonb,
                updated_at  = NOW()
            WHERE player_id=$3"#,
-        serde_json::json!([body.event_key]),
-        serde_json::json!({ body.event_key: body.choice_key }),
+        serde_json::json!([body.event_key.clone()]),
+        serde_json::json!({ body.event_key.clone(): body.choice_key.clone() }),
         pid
     ).execute(&state.db).await?;
 
