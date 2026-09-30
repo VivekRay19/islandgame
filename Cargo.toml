@@ -1,3 +1,9 @@
 [workspace]
 members = ["game-server", "game-client"]
 resolver = "2"
+
+[profile.release]
+opt-level = 3
+
+[profile.release.package.cultural_islands_client]
+opt-level = "s"

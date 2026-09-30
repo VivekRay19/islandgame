@@ -16,7 +16,7 @@ rustup target add wasm32-unknown-unknown
 
 # PostgreSQL (should already be running)
 # Verify:
-psql -U jofrey -c "\l"
+psql -U jofrey -d postgres -c "\l"
 ```
 
 ---
@@ -24,8 +24,11 @@ psql -U jofrey -c "\l"
 ## 2. Database Setup
 
 ```bash
-# Create the database
-psql -U jofrey -c "CREATE DATABASE cultural_islands;"
+# Create the database (connect to 'postgres' db first)
+psql -U jofrey -d postgres -c "CREATE DATABASE cultural_islands;"
+
+# If jofrey user is not a postgres superuser, create it via postgres user:
+# sudo -u postgres psql -c "CREATE DATABASE cultural_islands OWNER jofrey;"
 
 # Run schema
 psql -U jofrey -d cultural_islands -f database/001_schema.sql
@@ -52,6 +55,7 @@ cp .env.example .env
 
 ```bash
 cd game-client
+chmod +x build.sh
 ./build.sh
 # This downloads mq_js_bundle.js and builds cultural_islands_client.wasm
 # Both go into ../static/
