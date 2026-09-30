@@ -6,8 +6,7 @@ pub const GRASS_DARK:    Color = Color { r: 0.13, g: 0.36, b: 0.16, a: 1.0 }; //
 pub const GRASS_LIGHT:   Color = Color { r: 0.27, g: 0.55, b: 0.29, a: 1.0 }; // #448B4A
 pub const SKY:           Color = Color { r: 0.28, g: 0.60, b: 0.85, a: 1.0 }; // soft blue
 
-// Gold (primary CoC accent)
-pub const GOLD:          Color = Color { r: 1.00, g: 0.78, b: 0.00, a: 1.0 }; // #FFC800
+// Gold (primary CoC accent - GOLD comes from macroquad::prelude::GOLD)
 pub const GOLD_DARK:     Color = Color { r: 0.72, g: 0.48, b: 0.00, a: 1.0 }; // #B87A00
 pub const GOLD_TEXT:     Color = Color { r: 1.00, g: 0.90, b: 0.45, a: 1.0 }; // #FFE573
 
@@ -28,8 +27,7 @@ pub const RED_BTN_HI:    Color = Color { r: 0.90, g: 0.18, b: 0.10, a: 1.0 }; //
 pub const BLUE_BTN:      Color = Color { r: 0.10, g: 0.48, b: 0.82, a: 1.0 }; // #1A7AD1
 pub const DISABLED:      Color = Color { r: 0.30, g: 0.30, b: 0.30, a: 1.0 };
 
-// Text
-pub const WHITE:         Color = Color { r: 1.0,  g: 1.0,  b: 1.0,  a: 1.0 };
+// Text (WHITE comes from macroquad::prelude::WHITE)
 pub const SHADOW:        Color = Color { r: 0.0,  g: 0.0,  b: 0.0,  a: 0.65 };
 
 // Tile surface colours  (top face)

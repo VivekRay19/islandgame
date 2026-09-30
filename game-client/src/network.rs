@@ -1,6 +1,5 @@
 //! HTTP client wrappers using quad-net (works in WASM + native)
 use quad_net::http_request::{RequestBuilder, Method};
-use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 pub const API_BASE: &str = "http://192.168.8.10:8067/api";
@@ -12,13 +11,13 @@ pub struct PendingRequest {
 impl PendingRequest {
     pub fn try_recv(&mut self) -> Option<Result<Value, String>> {
         match self.inner.try_recv() {
-            Some(Some(body)) => {
+            Some(Ok(body)) => {
                 match serde_json::from_str::<Value>(&body) {
                     Ok(v) => Some(Ok(v)),
                     Err(e) => Some(Err(format!("JSON parse: {e}\nBody: {body}"))),
                 }
             }
-            Some(None) => Some(Err("Empty or failed response".into())),
+            Some(Err(e)) => Some(Err(format!("HTTP error: {e:?}"))),
             None => None,
         }
     }
@@ -36,7 +35,7 @@ fn get(path: &str, token: Option<&str>) -> PendingRequest {
 fn post(path: &str, token: Option<&str>, body: &str) -> PendingRequest {
     let url = format!("{}{}", API_BASE, path);
     let mut b = RequestBuilder::new(&url)
-        .method(Method::POST)
+        .method(Method::Post)
         .header("Content-Type", "application/json")
         .body(body);
     if let Some(t) = token {

@@ -136,7 +136,7 @@ pub fn draw_game(
              player_name);
 
     // ── Island board ─────────────────────────────────────────────────────
-    let board_w  = sw * 0.60;
+    let _board_w = sw * 0.60;
     let origin_x = sw * 0.08 + s.camera_offset.0;
     let origin_y = sh * 0.42 + s.camera_offset.1;
     let (mx, my) = mouse_position();

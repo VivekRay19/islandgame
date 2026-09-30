@@ -78,7 +78,7 @@ pub fn draw_lobby(s: &mut LobbyState, t: f32) -> LobbyAction {
                 if button(m, bx, content_y+26.0, 140.0, 34.0, col) { s.selected_mode = i; }
             }
             draw_text_shadow("Your Island", lx, content_y+82.0, 15.0, GOLD_TEXT);
-            for (i,(key, label, hint)) in ISLANDS.iter().enumerate() {
+            for (i,(_key, label, hint)) in ISLANDS.iter().enumerate() {
                 let bx = lx + i as f32 * ((pw-40.0)/4.0);
                 let col = if s.selected_island==i { GOLD_DARK } else { PANEL_MID };
                 if button(label, bx, content_y+88.0, (pw-40.0)/4.0-4.0, 42.0, col) {
@@ -116,7 +116,7 @@ pub fn draw_lobby(s: &mut LobbyState, t: f32) -> LobbyAction {
             }
             draw_text_field("Code", &s.join_code, lx, content_y+30.0, pw-40.0, 42.0, true);
             draw_text_shadow("Your Island", lx, content_y+96.0, 15.0, GOLD_TEXT);
-            for (i,(key,label,_)) in ISLANDS.iter().enumerate() {
+            for (i,(_key,label,_)) in ISLANDS.iter().enumerate() {
                 let bx = lx + i as f32 * ((pw-40.0)/4.0);
                 let col = if s.selected_island==i { GOLD_DARK } else { PANEL_MID };
                 if button(label, bx, content_y+102.0, (pw-40.0)/4.0-4.0, 38.0, col) { s.selected_island=i; }
