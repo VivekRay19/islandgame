@@ -1,157 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Cultural Islands</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cultural Islands</title>
 
-    html, body {
-      width: 100%; height: 100%;
-      background: #0e1f09;
-      overflow: hidden;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-    }
+    <!-- Polyfill for crypto.randomUUID on non-HTTPS / HTTP IP environments -->
+    <script>
+        if (!window.crypto) {
+            window.crypto = {};
+        }
+        if (!window.crypto.randomUUID) {
+            window.crypto.randomUUID = function () {
+                return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, function (c) {
+                    var r = window.crypto.getRandomValues ? window.crypto.getRandomValues(new Uint8Array(1))[0] : Math.floor(Math.random() * 256);
+                    return (c ^ (r & (15 >> (c / 4)))).toString(16);
+                });
+            };
+        }
+    </script>
 
-    #loading-screen {
-      position: fixed; inset: 0;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      background: linear-gradient(160deg, #0e1f09 0%, #1b3a10 50%, #0e1f09 100%);
-      z-index: 100;
-      transition: opacity 0.6s ease;
-    }
-    #loading-screen.hidden { opacity: 0; pointer-events: none; }
-
-    .logo-title {
-      font-size: 2.8rem; font-weight: 900; letter-spacing: 3px;
-      color: #ffc800;
-      text-shadow: 0 0 24px #ffc80088, 2px 3px 0 #4d3300;
-      margin-bottom: 8px;
-    }
-    .logo-sub {
-      color: #c7bfab; font-size: 1rem; letter-spacing: 1px;
-      margin-bottom: 42px;
-    }
-
-    .hex-row {
-      display: flex; gap: 10px; margin-bottom: 36px;
-    }
-    .hex {
-      width: 46px; height: 52px;
-      background: #3a7a20;
-      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-      animation: hexPulse 1.4s ease-in-out infinite;
-    }
-    .hex:nth-child(1){ background:#3a7a20; animation-delay:0.0s }
-    .hex:nth-child(2){ background:#1c5e21; animation-delay:0.2s }
-    .hex:nth-child(3){ background:#1a75b5; animation-delay:0.4s }
-    .hex:nth-child(4){ background:#8a2bb0; animation-delay:0.6s }
-    .hex:nth-child(5){ background:#d98c2e; animation-delay:0.8s }
-    @keyframes hexPulse {
-      0%,100% { transform: translateY(0)   scale(1.0); opacity: 0.8; }
-      50%      { transform: translateY(-8px) scale(1.07); opacity: 1.0; }
-    }
-
-    .loading-bar-wrap {
-      width: 280px; height: 12px;
-      background: #1a1008;
-      border: 1.5px solid #8c591a;
-      border-radius: 6px; overflow: hidden;
-    }
-    .loading-bar {
-      height: 100%; width: 0%;
-      background: linear-gradient(90deg, #ffc800, #ff8f00);
-      border-radius: 6px;
-      animation: loadBar 2.2s ease-in-out forwards;
-    }
-    @keyframes loadBar { to { width: 100%; } }
-
-    .loading-label {
-      color: #ffc800; font-size: 0.82rem;
-      margin-top: 10px; letter-spacing: 1px;
-    }
-
-    canvas {
-      display: block;
-      width: 100vw; height: 100vh;
-      image-rendering: -webkit-optimize-contrast;
-      image-rendering: crisp-edges;
-    }
-  </style>
-  <!-- Polyfill crypto.randomUUID for insecure/LAN HTTP contexts (stops browser extensions from crashing) -->
-  <script>
-    if (typeof window !== 'undefined') {
-      if (!window.crypto) window.crypto = {};
-      if (!window.crypto.randomUUID) {
-        window.crypto.randomUUID = function() {
-          return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, function(c) {
-            var r = window.crypto.getRandomValues ? window.crypto.getRandomValues(new Uint8Array(1))[0] : Math.floor(Math.random() * 256);
-            return (c ^ (r & (15 >> (c / 4)))).toString(16);
-          });
-        };
-      }
-    }
-  </script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0e1f09;
+            font-family: sans-serif;
+        }
+        #glcanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            outline: none;
+        }
+    </style>
 </head>
 <body>
-  <!-- Splash screen shown while WASM loads -->
-  <div id="loading-screen">
-    <div class="logo-title">CULTURAL ISLANDS</div>
-    <div class="logo-sub">Island Development &amp; Survival</div>
-    <div class="hex-row">
-      <div class="hex"></div><div class="hex"></div><div class="hex"></div>
-      <div class="hex"></div><div class="hex"></div>
-    </div>
-    <div class="loading-bar-wrap">
-      <div class="loading-bar"></div>
-    </div>
-    <div class="loading-label">Loading game engine…</div>
-  </div>
+    <canvas id="glcanvas" tabindex='1'></canvas>
 
-  <!-- Macroquad renders here -->
-  <canvas id="glcanvas" tabindex="1" width="1280" height="720"></canvas>
-
-  <script src="mq_js_bundle.js"></script>
-  <script src="quad-net.js"></script>
-  <script>
-    (function () {
-      const splash = document.getElementById('loading-screen');
-      const glCanvas = document.getElementById('glcanvas');
-
-      window.addEventListener('error', function(e) {
-        console.error("Game Client Error:", e.error || e.message);
-      });
-
-      function hideSplash() {
-        if (splash && !splash.classList.contains('hidden')) {
-          splash.classList.add('hidden');
-          setTimeout(() => { splash.style.display = 'none'; }, 500);
-        }
-      }
-
-      // Start the Macroquad WASM client
-      load("cultural_islands_client.wasm");
-
-      // Hide splash as soon as miniquad initial frame runs, with fallback
-      let elapsed = 0;
-      const check = setInterval(() => {
-        elapsed += 100;
-        if (glCanvas && (glCanvas.width > 0 || glCanvas.clientWidth > 0) && elapsed >= 400) {
-          clearInterval(check);
-          hideSplash();
-        } else if (elapsed >= 3000) {
-          clearInterval(check);
-          hideSplash();
-        }
-      }, 100);
-
-      document.addEventListener('contextmenu', e => e.preventDefault());
-      if (glCanvas) {
-        glCanvas.focus();
-      }
-    })();
-  </script>
+    <!-- Miniquad JS Glue Bundle -->
+    <script src="mq_js_bundle.js"></script>
+    <script>
+        load("cultural_islands_client.wasm");
+    </script>
 </body>
 </html>
