@@ -3,16 +3,28 @@
 
 <head>
   <script>
-    // Polyfill crypto.randomUUID for non-HTTPS / non-secure context compatibility
     (function () {
+      function generateUUID() {
+        return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, function (c) {
+          return (c ^ (Math.random() * 16 >> (c / 4))).toString(16);
+        });
+      }
+
+      var g = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : self);
+
+      if (!g.crypto) {
+        g.crypto = {};
+      }
+
+      if (typeof g.crypto.randomUUID !== 'function') {
+        g.crypto.randomUUID = generateUUID;
+      }
+
       if (typeof window !== 'undefined') {
-        if (!window.crypto) window.crypto = {};
-        if (typeof window.crypto.randomUUID !== 'function') {
-          window.crypto.randomUUID = function randomUUID() {
-            return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, function (c) {
-              return (c ^ (Math.random() * 16 >> (c / 4))).toString(16);
-            });
-          };
+        if (!window.crypto) window.crypto = g.crypto;
+        window.crypto.randomUUID = generateUUID;
+        if (typeof Crypto !== 'undefined' && Crypto.prototype && !Crypto.prototype.randomUUID) {
+          Crypto.prototype.randomUUID = generateUUID;
         }
       }
     })();
@@ -26,8 +38,8 @@
     body {
       margin: 0;
       padding: 0;
-      width: 100%;
-      height: 100%;
+      width: 100vw;
+      height: 100vh;
       overflow: hidden;
       background-color: #0d1117;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -47,7 +59,7 @@
       left: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
-      background: rgba(22, 27, 34, 0.92);
+      background: rgba(22, 27, 34, 0.95);
       backdrop-filter: blur(8px);
       padding: 28px 36px;
       border-radius: 12px;
@@ -99,23 +111,17 @@
 </head>
 
 <body>
-  <canvas id="glcanvas"></canvas>
+  <canvas id="glcanvas" tabindex="1"></canvas>
 
   <div id="status-overlay">
     <div id="spinner" class="spinner"></div>
     <div id="status-title" style="font-weight: 500;">Loading Cultural Islands...</div>
-    <div id="status-desc" class="error-desc" style="margin-top: 6px;">Initializing WebGL engine & WASM bindings</div>
+    <div id="status-desc" class="error-desc" style="margin-top: 6px;">Initializing WebGL canvas & WASM game engine</div>
   </div>
 
   <script>
     (function () {
       'use strict';
-
-      var MINIQUAD_VERSION = 196624;
-      var canvas = null;
-      var gl = null;
-      var wasm_exports = null;
-      var plugins = [];
 
       function showStatusError(title, desc) {
         var overlay = document.getElementById("status-overlay");
@@ -131,178 +137,6 @@
         if (overlay) overlay.classList.remove("hidden");
       }
 
-      function hideStatusOverlay() {
-        var overlay = document.getElementById("status-overlay");
-        if (overlay) overlay.classList.add("hidden");
-      }
-
-      function get_gl_context() {
-        if (gl) return gl;
-
-        if (!canvas) {
-          canvas = document.getElementById("glcanvas") || document.querySelector("canvas");
-        }
-
-        if (!canvas) return null;
-
-        var params = {
-          alpha: false,
-          antiAlias: false,
-          depth: true,
-          stencil: true,
-          premultipliedAlpha: false,
-          preserveDrawingBuffer: false,
-          powerPreference: "high-performance"
-        };
-
-        try {
-          gl = canvas.getContext("webgl2", params) ||
-            canvas.getContext("webgl", params) ||
-            canvas.getContext("experimental-webgl", params);
-        } catch (e) {
-          console.error("[Miniquad JS] Failed to acquire WebGL context:", e);
-        }
-
-        if (gl) {
-          window.gl = gl;
-        } else {
-          console.error("[Miniquad JS] WebGL is not supported or disabled in this browser.");
-          showStatusError("WebGL Not Supported", "Your browser or device context does not support WebGL hardware acceleration.");
-        }
-
-        return gl;
-      }
-
-      var baseEnv = {
-        console_log: function (ptr, len) {
-          if (!wasm_exports || !wasm_exports.memory) return;
-          var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
-          console.log(new TextDecoder("utf-8").decode(bytes));
-        },
-        console_info: function (ptr, len) {
-          if (!wasm_exports || !wasm_exports.memory) return;
-          var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
-          console.info(new TextDecoder("utf-8").decode(bytes));
-        },
-        console_warn: function (ptr, len) {
-          if (!wasm_exports || !wasm_exports.memory) return;
-          var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
-          console.warn(new TextDecoder("utf-8").decode(bytes));
-        },
-        console_error: function (ptr, len) {
-          if (!wasm_exports || !wasm_exports.memory) return;
-          var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
-          console.error(new TextDecoder("utf-8").decode(bytes));
-        },
-        miniquad_version: function () {
-          return MINIQUAD_VERSION;
-        },
-        _webglGet: function (pname) {
-          var ctx = get_gl_context();
-          if (!ctx) return 0;
-          try {
-            var val = ctx.getParameter(pname);
-            if (typeof val === 'number') return val;
-            if (typeof val === 'boolean') return val ? 1 : 0;
-          } catch (e) {
-            console.warn("[Miniquad JS] _webglGet failed for pname:", pname, e);
-          }
-          return 0;
-        },
-        glGetIntegerv: function (pname, params_ptr) {
-          var ctx = get_gl_context();
-          if (!ctx || !wasm_exports || !wasm_exports.memory) return;
-          try {
-            var val = ctx.getParameter(pname);
-            var view = new Int32Array(wasm_exports.memory.buffer, params_ptr, 1);
-            if (typeof val === 'number') {
-              view[0] = val;
-            } else if (typeof val === 'boolean') {
-              view[0] = val ? 1 : 0;
-            }
-          } catch (e) {
-            console.warn("[Miniquad JS] glGetIntegerv failed for pname:", pname, e);
-          }
-        }
-      };
-
-      var envProxy = new Proxy(baseEnv, {
-        get: function (target, prop) {
-          if (prop in target) return target[prop];
-          return function () {
-            console.warn("[Miniquad Stub] Called unhandled env function: " + String(prop), arguments);
-            return 0;
-          };
-        }
-      });
-
-      var wbindgenStubs = {
-        __wbindgen_describe: function () { },
-        __wbindgen_throw: function (ptr, len) {
-          var msg = "WASM Panic";
-          if (wasm_exports && wasm_exports.memory) {
-            var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
-            msg = new TextDecoder("utf-8").decode(bytes);
-          }
-          console.error("[wasm-bindgen panic]", msg);
-          showStatusError("WASM Application Panic", msg);
-          throw new Error(msg);
-        },
-        __wbindgen_object_drop_ref: function () { },
-        __wbindgen_object_clone_ref: function () { return 0; },
-        __wbindgen_cb_drop: function () { return true; },
-        __wbindgen_number_get: function () { return 0; },
-        __wbindgen_is_undefined: function () { return true; },
-        __wbindgen_is_null: function () { return false; },
-        __wbindgen_is_f64: function () { return false; },
-        __wbindgen_is_string: function () { return false; },
-        __wbindgen_string_new: function () { return 0; },
-        __wbindgen_string_get: function () { return 0; }
-      };
-
-      var wbindgenProxy = new Proxy(wbindgenStubs, {
-        get: function (target, prop) {
-          if (prop in target) return target[prop];
-          return function () {
-            console.warn("[wasm-bindgen stub] Called __wbindgen_placeholder__." + String(prop), arguments);
-            return 0;
-          };
-        }
-      });
-
-      var baseImportObject = {
-        env: envProxy,
-        __wbindgen_placeholder__: wbindgenProxy
-      };
-
-      var importObject = new Proxy(baseImportObject, {
-        get: function (target, moduleName) {
-          if (moduleName in target) return target[moduleName];
-
-          var dynamicModuleProxy = new Proxy({}, {
-            get: function (modTarget, prop) {
-              if (prop in modTarget) return modTarget[prop];
-              return function () {
-                console.warn("[WASM Stub] Called " + String(moduleName) + "." + String(prop), arguments);
-                return 0;
-              };
-            }
-          });
-
-          target[moduleName] = dynamicModuleProxy;
-          return dynamicModuleProxy;
-        }
-      });
-
-      function register_plugin(plugin) {
-        plugins.push(plugin);
-        if (plugin.register_plugin) {
-          plugin.register_plugin(importObject);
-        }
-      }
-
-      window.miniquad_add_plugin = register_plugin;
-
       function loadScript(src) {
         return new Promise(function (resolve) {
           var script = document.createElement("script");
@@ -313,100 +147,34 @@
         });
       }
 
-      function fetchWasmBinary(paths, index, resolve, reject) {
-        if (index >= paths.length) {
-          reject(new Error("Could not find WASM binary at any expected locations: " + paths.join(", ")));
-          return;
+      // Load quad-net.js and mq_js_bundle.js from root or static directory
+      Promise.all([
+        loadScript("quad-net.js").then(function (ok) { return ok || loadScript("static/quad-net.js"); }),
+        loadScript("mq_js_bundle.js").then(function (ok) { return ok || loadScript("static/mq_js_bundle.js"); })
+      ]).then(function () {
+        if (typeof window.load === "function") {
+          // Miniquad JS bundle loaded successfully
+          var wasmCandidate = "cultural_islands_client.wasm";
+
+          // Hide overlay once WebGL render starts
+          var checkCanvas = setInterval(function () {
+            var canvas = document.getElementById("glcanvas");
+            if (canvas && canvas.width > 0 && canvas.height > 0) {
+              var overlay = document.getElementById("status-overlay");
+              if (overlay) overlay.classList.add("hidden");
+              clearInterval(checkCanvas);
+            }
+          }, 500);
+
+          // Execute miniquad load
+          window.load(wasmCandidate);
+        } else {
+          showStatusError("Script Load Failure", "Could not load mq_js_bundle.js. Ensure static files are present in the web server directory.");
         }
-
-        var currentPath = paths[index];
-        fetch(currentPath)
-          .then(function (response) {
-            if (response.ok) {
-              return response.arrayBuffer();
-            }
-            throw new Error("HTTP " + response.status);
-          })
-          .then(function (bytes) {
-            resolve({ bytes: bytes, path: currentPath });
-          })
-          .catch(function () {
-            fetchWasmBinary(paths, index + 1, resolve, reject);
-          });
-      }
-
-      window.load = function (wasm_path) {
-        if (document.readyState === "loading") {
-          document.addEventListener("DOMContentLoaded", function () {
-            window.load(wasm_path);
-          });
-          return;
-        }
-
-        get_gl_context();
-
-        // Dynamically try loading helper plugin scripts first
-        Promise.all([
-          loadScript("quad-net.js").then(function (ok) { if (!ok) return loadScript("static/quad-net.js"); }),
-          loadScript("mq_js_bundle.js").then(function (ok) { if (!ok) return loadScript("static/mq_js_bundle.js"); })
-        ]).then(function () {
-          var candidatePaths = [
-            wasm_path,
-            "cultural_islands_client.wasm",
-            "static/cultural_islands_client.wasm",
-            "/static/cultural_islands_client.wasm",
-            "/cultural_islands_client.wasm"
-          ];
-
-          return new Promise(function (resolve, reject) {
-            fetchWasmBinary(candidatePaths, 0, resolve, reject);
-          });
-        })
-          .then(function (result) {
-            return WebAssembly.instantiate(result.bytes, importObject);
-          })
-          .then(function (results) {
-            wasm_exports = results.instance.exports;
-
-            plugins.forEach(function (plugin) {
-              if (plugin.on_init) plugin.on_init(wasm_exports);
-            });
-
-            function resize() {
-              if (!canvas) canvas = document.getElementById("glcanvas") || document.querySelector("canvas");
-              if (!canvas) return;
-
-              canvas.width = window.innerWidth * (window.devicePixelRatio || 1);
-              canvas.height = window.innerHeight * (window.devicePixelRatio || 1);
-
-              var ctx = get_gl_context();
-              if (ctx) {
-                ctx.viewport(0, 0, canvas.width, canvas.height);
-              }
-            }
-
-            window.addEventListener('resize', resize);
-            resize();
-
-            hideStatusOverlay();
-
-            if (wasm_exports.main) {
-              wasm_exports.main();
-            } else if (wasm_exports._start) {
-              wasm_exports._start();
-            } else {
-              console.error("[Miniquad JS] Neither main() nor _start() exported in WASM!");
-              showStatusError("Execution Error", "No main entry point found in the loaded WASM binary.");
-            }
-          })
-          .catch(function (err) {
-            console.error("[Miniquad JS] Error loading WASM binary:", err);
-            showStatusError("WASM Binary Load Failed", err.message);
-          });
-      };
+      }).catch(function (err) {
+        showStatusError("Initialization Error", err.message || "Failed to initialize game JS bundle.");
+      });
     })();
-
-    window.load("cultural_islands_client.wasm");
   </script>
 </body>
 
