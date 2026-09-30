@@ -1,4 +1,4 @@
-use macroquad::color::Color;
+use macroquad::color::{Color, WHITE};
 
 // ── CoC-inspired palette ─────────────────────────────────────────────────────
 pub const BG_DARK:       Color = Color { r: 0.07, g: 0.12, b: 0.05, a: 1.0 }; // dark forest night
