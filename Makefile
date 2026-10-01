@@ -21,6 +21,13 @@ STATIC_DIR    := static
 WASM_TARGET   := wasm32-unknown-unknown
 WASM_BIN      := cultural_islands_client.wasm
 
+# Pinned macroquad version — must match the version in game-client/Cargo.toml
+# and Cargo.lock (currently macroquad = "0.3.26", miniquad = "0.3.16").
+# FIX: mq_js_bundle.js is now downloaded from the exact crate version every
+# build so the JS/WASM version handshake never gets out of sync again.
+MACROQUAD_VER := 0.3.26
+MQ_BUNDLE_URL := https://static.crates.io/crates/macroquad/macroquad-$(MACROQUAD_VER).crate
+
 # Database connection settings (overridden by .env or CLI args)
 DBP_USER      ?= jofrey
 DBP_PASSWORD  ?= 2025
@@ -36,7 +43,7 @@ DEPLOY_USER   ?= $(if $(SUDO_USER),$(SUDO_USER),$(shell id -un))
 DEPLOY_GROUP  ?= $(if $(SUDO_USER),$(shell id -gn $(SUDO_USER)),$(shell id -gn))
 CURR_DIR      := $(shell pwd)
 
-.PHONY: all build build-client build-server start stop restart status logs clean health install db-setup db-migrate db-seed help
+.PHONY: all build build-client build-server start stop restart status logs clean clean-js health install db-setup db-migrate db-seed help
 
 all: build
 
@@ -59,6 +66,7 @@ help:
 	@echo "  make logs          Follow live service logs (journalctl)"
 	@echo "  make health        Check health endpoint (http://127.0.0.1:8067/health)"
 	@echo "  make clean         Clean compiled build artifacts"
+	@echo "  make clean-js      Force re-download mq_js_bundle.js on next build"
 	@echo "══════════════════════════════════════════════════════════════════"
 
 ## Build WASM client and server release binary
@@ -66,14 +74,21 @@ build: build-client build-server
 	@echo "✓ Full build complete (Client WASM + Server binary)"
 
 ## Build WASM client and bundle assets into static/
+## FIX: mq_js_bundle.js is ALWAYS re-fetched from the pinned crate tarball
+##      so the GL JS/WASM version pair stays consistent. The old conditional
+##      `if [ ! -f mq_js_bundle.js ]` silently kept a stale copy that caused:
+##        "Version mismatch: gl.js version is: 2, miniquad crate version is: 196624"
+##        "Cannot read properties of undefined (reading 'getParameter')" → blank screen
 build-client:
 	@echo "▶ Checking wasm target..."
 	@rustup target list --installed | grep -q "$(WASM_TARGET)" || rustup target add $(WASM_TARGET)
 	@mkdir -p $(STATIC_DIR)
-	@if [ ! -f "$(STATIC_DIR)/mq_js_bundle.js" ]; then \
-		echo "▶ Downloading Macroquad JS bundle..."; \
-		curl -fsSL -o "$(STATIC_DIR)/mq_js_bundle.js" "https://not-fl3.github.io/miniquad-samples/mq_js_bundle.js"; \
-	fi
+	@echo "▶ Downloading mq_js_bundle.js for macroquad $(MACROQUAD_VER)..."
+	@curl -fsSL "$(MQ_BUNDLE_URL)" \
+		| tar -xzO macroquad-$(MACROQUAD_VER)/js/mq_js_bundle.js \
+		> "$(STATIC_DIR)/mq_js_bundle.js" \
+		&& echo "  ✓ mq_js_bundle.js updated ($(shell wc -c < $(STATIC_DIR)/mq_js_bundle.js) bytes)" \
+		|| (echo "  ✗ Download failed — check network and $(MQ_BUNDLE_URL)" && exit 1)
 	@echo "▶ Building WASM client (release)..."
 	cargo build --release -p cultural_islands_client --target $(WASM_TARGET)
 	@cp target/$(WASM_TARGET)/release/$(WASM_BIN) $(STATIC_DIR)/
@@ -119,6 +134,11 @@ clean:
 	rm -f $(STATIC_DIR)/$(WASM_BIN)
 	@echo "✓ target/ and client WASM removed"
 
+## Force mq_js_bundle.js to be re-downloaded on next build-client
+clean-js:
+	rm -f $(STATIC_DIR)/mq_js_bundle.js
+	@echo "✓ mq_js_bundle.js removed; it will be re-downloaded on next make build-client"
+
 ## Check health endpoint
 health:
 	@curl -s http://127.0.0.1:8067/health | (python3 -m json.tool 2>/dev/null || cat) || echo "Server not reachable"
@@ -132,7 +152,7 @@ db-setup:
 	 DB_PORT=$$(echo "$$DATABASE_URL" | sed -E 's|.*:([0-9]+)/.*|\1|'); \
 	 DB_NAME=$$(echo "$$DATABASE_URL" | sed -E 's|.*/([^?]+).*|\1|'); \
 	 echo "▶ Configuring PostgreSQL user '$$DB_USER' and database '$$DB_NAME'..."; \
-	 sudo -u postgres psql -c "DO \$$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$$DB_USER') THEN CREATE ROLE $$DB_USER LOGIN PASSWORD '$$DB_PASS' SUPERUSER; ELSE ALTER USER $$DB_USER WITH PASSWORD '$$DB_PASS'; END IF; END \$\$;"; \
+	 sudo -u postgres psql -c "DO \$$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$$DB_USER') THEN CREATE ROLE $$DB_USER LOGIN PASSWORD '$$DB_PASS' SUPERUSER; ELSE ALTER USER $$DB_USER WITH PASSWORD '$$DB_PASS'; END IF; END \$$;"; \
 	 sudo -u postgres psql -c "CREATE DATABASE $$DB_NAME OWNER $$DB_USER;" 2>/dev/null || true; \
 	 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $$DB_NAME TO $$DB_USER;"; \
 	 echo "▶ Applying schema migrations (001_schema.sql)..."; \
