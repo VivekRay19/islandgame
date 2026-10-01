@@ -4,21 +4,45 @@
 <head>
   <script>
     (function () {
+      'use strict';
       function generateUUID() {
-        return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, function (c) {
+        return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, function (c) {
           return (c ^ (Math.random() * 16 >> (c / 4))).toString(16);
         });
       }
 
-      var g = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : self);
-      if (!g.crypto) g.crypto = {};
-      if (typeof g.crypto.randomUUID !== 'function') g.crypto.randomUUID = generateUUID;
-      if (typeof window !== 'undefined') {
-        if (!window.crypto) window.crypto = g.crypto;
-        window.crypto.randomUUID = generateUUID;
-        if (typeof Crypto !== 'undefined' && Crypto.prototype && !Crypto.prototype.randomUUID) {
-          Crypto.prototype.randomUUID = generateUUID;
+      try {
+        var g = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : self);
+        if (!g.crypto) g.crypto = {};
+
+        // Define on crypto object using defineProperty to bypass read-only guards in extensions
+        if (typeof g.crypto.randomUUID !== 'function') {
+          try {
+            Object.defineProperty(g.crypto, 'randomUUID', {
+              value: generateUUID,
+              configurable: true,
+              writable: true,
+              enumerable: true
+            });
+          } catch (e) {
+            g.crypto.randomUUID = generateUUID;
+          }
         }
+
+        if (typeof window !== 'undefined') {
+          window.crypto = g.crypto;
+          if (typeof Crypto !== 'undefined' && Crypto.prototype) {
+            try {
+              Object.defineProperty(Crypto.prototype, 'randomUUID', {
+                value: generateUUID,
+                configurable: true,
+                writable: true
+              });
+            } catch (e) { }
+          }
+        }
+      } catch (err) {
+        console.warn("[Polyfill] crypto.randomUUID patch notice:", err);
       }
     })();
   </script>
@@ -44,6 +68,7 @@
       height: 100%;
       display: block;
       touch-action: none;
+      outline: none;
     }
 
     #status-overlay {
@@ -52,28 +77,31 @@
       left: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
-      background: rgba(22, 27, 34, 0.95);
-      backdrop-filter: blur(8px);
+      background: rgba(22, 27, 34, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       padding: 28px 36px;
-      border-radius: 12px;
+      border-radius: 16px;
       border: 1px solid rgba(255, 255, 255, 0.12);
       max-width: 85%;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-      transition: opacity 0.3s ease;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      transition: opacity 0.4s ease, visibility 0.4s ease;
       z-index: 9999;
     }
 
     .hidden {
-      display: none !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
     }
 
     .spinner {
-      border: 3px solid rgba(255, 255, 255, 0.1);
+      border: 3px solid rgba(255, 255, 255, 0.15);
       border-top: 3px solid #58a6ff;
       border-radius: 50%;
-      width: 32px;
-      height: 32px;
-      animation: spin 1s linear infinite;
+      width: 36px;
+      height: 36px;
+      animation: spin 0.9s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite;
       margin: 0 auto 16px auto;
     }
 
@@ -94,8 +122,8 @@
 
   <div id="status-overlay">
     <div id="spinner" class="spinner"></div>
-    <div id="status-title" style="font-weight: 500;">Loading Cultural Islands...</div>
-    <div id="status-desc" style="font-size: 0.85rem; color: #8b949e; margin-top: 6px;">Initializing WebGL canvas &
+    <div id="status-title" style="font-weight: 600; font-size: 1.1rem;">Loading Cultural Islands...</div>
+    <div id="status-desc" style="font-size: 0.88rem; color: #8b949e; margin-top: 8px;">Initializing WebGL canvas &
       engine...</div>
   </div>
 
@@ -113,10 +141,10 @@
         });
       }
 
+      // Load Miniquad runtime script bundle
       Promise.all([
-        loadScript("mq_js_bundle.js")
-          .then(function (ok) { return ok || loadScript("static/mq_js_bundle.js"); })
-          .then(function (ok) { return ok || loadScript("miniquad_js_bundle.js"); })
+        loadScript("static/mq_js_bundle.js")
+          .then(function (ok) { return ok || loadScript("mq_js_bundle.js"); })
           .then(function (ok) { return ok || loadScript("static/miniquad_js_bundle.js"); })
       ]).then(function () {
         if (typeof window.load === "function") {
@@ -131,7 +159,7 @@
             window.load("static/cultural_islands_client.wasm");
           });
         } else {
-          document.getElementById("status-title").innerText = "Script Load Error";
+          document.getElementById("status-title").innerText = "Script Initialization Error";
           document.getElementById("status-desc").innerText = "Failed to load mq_js_bundle.js from static directory.";
           document.getElementById("spinner").style.display = "none";
         }
