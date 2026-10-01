@@ -11,15 +11,8 @@
       }
 
       var g = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : self);
-
-      if (!g.crypto) {
-        g.crypto = {};
-      }
-
-      if (typeof g.crypto.randomUUID !== 'function') {
-        g.crypto.randomUUID = generateUUID;
-      }
-
+      if (!g.crypto) g.crypto = {};
+      if (typeof g.crypto.randomUUID !== 'function') g.crypto.randomUUID = generateUUID;
       if (typeof window !== 'undefined') {
         if (!window.crypto) window.crypto = g.crypto;
         window.crypto.randomUUID = generateUUID;
@@ -93,20 +86,6 @@
         transform: rotate(360deg);
       }
     }
-
-    .error-title {
-      color: #f85149;
-      font-weight: 600;
-      font-size: 1.1rem;
-      margin-bottom: 8px;
-    }
-
-    .error-desc {
-      font-size: 0.9rem;
-      color: #8b949e;
-      line-height: 1.4;
-      word-break: break-word;
-    }
   </style>
 </head>
 
@@ -116,26 +95,13 @@
   <div id="status-overlay">
     <div id="spinner" class="spinner"></div>
     <div id="status-title" style="font-weight: 500;">Loading Cultural Islands...</div>
-    <div id="status-desc" class="error-desc" style="margin-top: 6px;">Initializing WebGL canvas & WASM game engine</div>
+    <div id="status-desc" style="font-size: 0.85rem; color: #8b949e; margin-top: 6px;">Initializing WebGL canvas &
+      engine...</div>
   </div>
 
   <script>
     (function () {
       'use strict';
-
-      function showStatusError(title, desc) {
-        var overlay = document.getElementById("status-overlay");
-        var spinner = document.getElementById("spinner");
-        var titleEl = document.getElementById("status-title");
-        var descEl = document.getElementById("status-desc");
-        if (spinner) spinner.style.display = "none";
-        if (titleEl) {
-          titleEl.className = "error-title";
-          titleEl.innerText = title;
-        }
-        if (descEl) descEl.innerText = desc;
-        if (overlay) overlay.classList.remove("hidden");
-      }
 
       function loadScript(src) {
         return new Promise(function (resolve) {
@@ -147,32 +113,28 @@
         });
       }
 
-      // Load quad-net.js and mq_js_bundle.js from root or static directory
       Promise.all([
-        loadScript("quad-net.js").then(function (ok) { return ok || loadScript("static/quad-net.js"); }),
-        loadScript("mq_js_bundle.js").then(function (ok) { return ok || loadScript("static/mq_js_bundle.js"); })
+        loadScript("mq_js_bundle.js")
+          .then(function (ok) { return ok || loadScript("static/mq_js_bundle.js"); })
+          .then(function (ok) { return ok || loadScript("miniquad_js_bundle.js"); })
+          .then(function (ok) { return ok || loadScript("static/miniquad_js_bundle.js"); })
       ]).then(function () {
         if (typeof window.load === "function") {
-          // Miniquad JS bundle loaded successfully
-          var wasmCandidate = "cultural_islands_client.wasm";
-
-          // Hide overlay once WebGL render starts
-          var checkCanvas = setInterval(function () {
-            var canvas = document.getElementById("glcanvas");
-            if (canvas && canvas.width > 0 && canvas.height > 0) {
-              var overlay = document.getElementById("status-overlay");
-              if (overlay) overlay.classList.add("hidden");
-              clearInterval(checkCanvas);
+          var wasmPath = "cultural_islands_client.wasm";
+          fetch(wasmPath, { method: 'HEAD' }).then(function (res) {
+            if (res.ok) {
+              window.load(wasmPath);
+            } else {
+              window.load("static/cultural_islands_client.wasm");
             }
-          }, 500);
-
-          // Execute miniquad load
-          window.load(wasmCandidate);
+          }).catch(function () {
+            window.load("static/cultural_islands_client.wasm");
+          });
         } else {
-          showStatusError("Script Load Failure", "Could not load mq_js_bundle.js. Ensure static files are present in the web server directory.");
+          document.getElementById("status-title").innerText = "Script Load Error";
+          document.getElementById("status-desc").innerText = "Failed to load mq_js_bundle.js from static directory.";
+          document.getElementById("spinner").style.display = "none";
         }
-      }).catch(function (err) {
-        showStatusError("Initialization Error", err.message || "Failed to initialize game JS bundle.");
       });
     })();
   </script>
