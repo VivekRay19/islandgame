@@ -15,7 +15,6 @@
         var g = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : self);
         if (!g.crypto) g.crypto = {};
 
-        // Define on crypto object using defineProperty to bypass read-only guards in extensions
         if (typeof g.crypto.randomUUID !== 'function') {
           try {
             Object.defineProperty(g.crypto, 'randomUUID', {
@@ -141,7 +140,7 @@
         });
       }
 
-      // Load Miniquad runtime script bundle
+      // Load Miniquad runtime script bundle without Vite dev tags
       Promise.all([
         loadScript("static/mq_js_bundle.js")
           .then(function (ok) { return ok || loadScript("mq_js_bundle.js"); })
