@@ -1,28 +1,29 @@
 # Cultural Islands — Precheck Report
 
-## Performed in the build environment
+## What was validated while preparing the archive
 
-- Repository source-sanity check: **PASS**
-- GDScript files statically inspected: **5**
-- Rust source files statically inspected: **21**
-- Godot scene/preload path references: **PASS**
-- Top-level unused-variable scan for the Godot client: **PASS**
-- Legacy browser-client scan in shipped runtime sources: **PASS**
-- Shell syntax (`bash -n`): **PASS**
-- Makefile parse/dry-run: **PASS**
-- Existing Rust backend tree compared with the uploaded original: **unchanged**
-- Existing database tree compared with the uploaded original: **unchanged**
-- Existing deployment tree compared with the uploaded original: **unchanged**
-- `Cargo.toml` and `Cargo.lock` compared with the uploaded original: **unchanged**
+- Rust backend source tree preserved from the supplied working backend.
+- Godot client tree contains only the new Godot client; legacy Phaser/browser client files are absent.
+- GDScript and Rust source structure was checked statically.
+- Project scene/preload references were checked structurally.
+- No generated build/cache files are shipped.
 
-## Compiler/runtime checks
+## Required machine-level validation
 
-This build environment does not contain `cargo`, `rustc`, `rustfmt`, or the Godot executable, so I did **not** claim a compiler/parser execution that did not happen.
+The preparation environment did not contain the Rust toolchain or Godot executable, so compiler/parser execution was not claimed here.
 
-The archive includes `tools/precheck.sh` and `tools/source_sanity.py` so the exact repository checks can be repeated on the server/workstation. Run:
+On the target Linux machine, run:
 
 ```bash
-./tools/precheck.sh
+make godot-install
+make precheck
+cargo build --release -p cultural-islands-server
 ```
 
-For a Rust-style workflow, the Makefile exposes the same checks as `make precheck`, and the client as `make godot-run` / `make godot-editor`.
+`make precheck` uses the repository-local Godot installation when available. It runs Rust formatting/checks and the Godot headless parser.
+
+## Target-machine runtime evidence supplied after the rebuild
+
+The target Linux server successfully completed both release and debug Rust builds. The debug server reached its normal startup state on HTTP `0.0.0.0:8067`, WebSocket `0.0.0.0:8068`, and PostgreSQL `127.0.0.1:5432/cultural_islands`; its only failure was `AddrInUse`, indicating that another server instance was already bound to the port. The existing systemd service continued serving game-state requests with HTTP 200 responses.
+
+The Godot launch failure was separate: the shell reported `godot: No such file or directory`. The updated repository therefore installs a pinned local Godot 4.7.2 binary with `make godot-install` and does not require a global `godot` executable.

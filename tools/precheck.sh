@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
+cd "$ROOT"
 
 echo "== Cultural Islands source precheck =="
 
@@ -11,8 +12,11 @@ python3 tools/source_sanity.py
 command -v cargo >/dev/null 2>&1 || { echo "ERROR: cargo is required" >&2; exit 1; }
 command -v rustfmt >/dev/null 2>&1 || { echo "ERROR: rustfmt is required" >&2; exit 1; }
 
-GODOT_BIN="${GODOT:-godot}"
-command -v "$GODOT_BIN" >/dev/null 2>&1 || { echo "ERROR: Godot 4.7.2+ is required (set GODOT=/path/to/godot)" >&2; exit 1; }
+GODOT_BIN="${GODOT:-$ROOT/.tools/godot-4.7.2/godot}"
+if [[ ! -x "$GODOT_BIN" ]] && command -v godot >/dev/null 2>&1; then
+  GODOT_BIN="$(command -v godot)"
+fi
+[[ -x "$GODOT_BIN" ]] || { echo "ERROR: Godot 4.7.2+ is required (run make godot-install or set GODOT=/path/to/godot)" >&2; exit 1; }
 
 echo "[1/5] Rust formatting"
 cargo fmt --all -- --check

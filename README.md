@@ -12,7 +12,7 @@ The Rust backend remains authoritative for game state, turn order, resources, ti
 
 ## Requirements
 
-Use **Godot 4.7.2 stable** for the client. Godot 4.7.2 is the stable 4.7 maintenance release.
+Use **Godot 4.7.2 stable** for the client. The repository can install a local copy with `make godot-install`; no system-wide Godot package is required.
 
 For the backend you need the normal Rust toolchain (`cargo`, `rustc`, `rustfmt`) and PostgreSQL.
 
@@ -40,11 +40,13 @@ Configure `.env` (or copy `.env.example` to `.env`) with the database/server set
 
 ## 2. Start the Rust backend
 
-Development:
+Development (only when another server instance is not already listening on port 8067):
 
 ```bash
 make run
 ```
+
+If the systemd service is already running, `make run` will correctly fail with `AddrInUse` because it would start a second backend on the same port. In that case use `make status` / `make logs`, or stop the service first with `make stop` before using `make run`.
 
 Installed/systemd deployment:
 
@@ -64,41 +66,51 @@ The REST API defaults to port `8067`; the existing WebSocket endpoint uses `8068
 
 ## 3. Configure the Godot client
 
-The client reads its API root from `CI_API_BASE`. The default is the existing backend address:
+The client reads its API root from `CI_API_BASE`. On this Linux deployment it defaults to the existing backend address:
 
 ```text
 http://192.168.8.10:8067/api
 ```
 
-Linux/macOS:
+For another server address, from the Linux repository root run:
 
 ```bash
 export CI_API_BASE=http://YOUR_SERVER:8067/api
 ```
 
-Windows PowerShell:
-
-```powershell
-$env:CI_API_BASE = "http://YOUR_SERVER:8067/api"
-```
-
 The client uses the backend over HTTP; no backend source needs to be moved into Godot.
 
-## 4. Open/run Godot
+## 4. Install and run Godot
 
-From the repository root:
+Run these commands **from the repository root**. The Makefile is intentionally at the repository root; do not `cd godot-client` and run its targets.
+
+Install the pinned Godot version locally:
+
+```bash
+make godot-install
+```
+
+Then launch the editor:
 
 ```bash
 make godot-editor
 ```
 
-Or run the game directly:
+Or launch the game directly:
 
 ```bash
 make godot-run
 ```
 
-You can also open `godot-client/project.godot` in the Godot editor.
+`make godot-run` launches the graphical Godot client, so the Linux machine must have an available graphical session (X11/Wayland). On a headless server, use `make client-check` to validate the project instead; do not expect a visible game window without a display server.
+
+You can also pass a manually installed Godot executable without changing the repository:
+
+```bash
+make GODOT=/path/to/godot godot-run
+```
+
+The local installer currently supports Linux x86_64 and arm64. It uses the official Godot 4.7.2 stable Linux archive.
 
 ## 5. Run the complete precheck
 
@@ -113,10 +125,10 @@ It runs:
 1. the repository source-sanity checker (balanced source, Godot references, top-level unused-variable scan, and legacy-client scan)
 2. `cargo fmt --all -- --check`
 3. `cargo check --workspace --all-targets`
-4. Godot's headless script/project parser
+4. Godot's headless script/project parser, using the repository-local Godot when installed
 5. the final project-tree sanity check
 
-The sandbox used to prepare this archive does **not** contain `cargo`, `rustc`, `rustfmt`, or the Godot executable, so compiler-level execution could not be truthfully claimed there. The archive was instead checked structurally/source-wise here, and `tools/precheck.sh` is the exact compiler/parser check to run on the server/workstation before deployment.
+The Godot setup is deliberately local and reproducible: `make godot-install` downloads the pinned Godot 4.7.2 binary into `.tools/`.
 
 ## 6. Game-client structure
 

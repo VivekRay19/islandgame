@@ -1,9 +1,11 @@
-.PHONY: all build-server fmt check source-sanity backend-check client-check precheck db-setup deploy install start stop restart status logs health run watch godot-editor godot-run clean
+.PHONY: all build-server fmt check source-sanity backend-check client-check precheck db-setup deploy install start stop restart status logs health run watch godot-install godot-editor godot-run clean
 
 DEPLOY_DIR   := /opt/islandgame
 SERVICE_NAME := cultural-islands
 SERVER_BIN   := target/release/cultural-islands-server
-GODOT        ?= godot
+GODOT_VERSION ?= 4.7.2
+GODOT_LOCAL   := .tools/godot-$(GODOT_VERSION)/godot
+GODOT        ?= $(GODOT_LOCAL)
 GODOT_CLIENT := godot-client
 
 all: build-server
@@ -27,6 +29,7 @@ source-sanity:
 
 client-check:
 	@echo "▶ Checking Godot client scripts…"
+	@test -x "$(GODOT)" || (echo "Godot not found at $(GODOT). Run: make godot-install" && exit 1)
 	$(GODOT) --headless --path $(GODOT_CLIENT) --editor --quit --check-only
 
 precheck: source-sanity fmt backend-check client-check
@@ -89,14 +92,24 @@ logs:
 health:
 	@curl -sf http://127.0.0.1:8067/health && echo " ✔ Healthy" || echo " ✘ Unreachable"
 run:
+	@if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet $(SERVICE_NAME) 2>/dev/null; then \
+		echo "$(SERVICE_NAME) is already running on the configured port."; \
+		echo "Use 'make status' / 'make logs', or run 'make stop' before 'make run'."; \
+		exit 1; \
+	fi
 	cargo run -p cultural-islands-server
 watch:
 	cargo watch -x 'run -p cultural-islands-server'
 
+godot-install:
+	./tools/install_godot.sh
+
 godot-editor:
+	@test -x "$(GODOT)" || (echo "Godot not found at $(GODOT). Run: make godot-install" && exit 1)
 	$(GODOT) --editor --path $(GODOT_CLIENT)
 
 godot-run:
+	@test -x "$(GODOT)" || (echo "Godot not found at $(GODOT). Run: make godot-install" && exit 1)
 	$(GODOT) --path $(GODOT_CLIENT)
 
 clean:
