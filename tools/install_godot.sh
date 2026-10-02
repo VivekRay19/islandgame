@@ -44,9 +44,18 @@ fi
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
-unzip -q "$ARCHIVE" -d "$TMP_DIR"
+if command -v unzip >/dev/null 2>&1; then
+  unzip -q "$ARCHIVE" -d "$TMP_DIR"
+elif command -v python3 >/dev/null 2>&1; then
+  python3 -c "import zipfile; zipfile.ZipFile('$ARCHIVE').extractall('$TMP_DIR')"
+elif command -v python >/dev/null 2>&1; then
+  python -c "import zipfile; zipfile.ZipFile('$ARCHIVE').extractall('$TMP_DIR')"
+else
+  echo "error: need unzip or python3 to extract Godot archive." >&2
+  exit 1
+fi
 
-SOURCE_BIN="$(find "$TMP_DIR" -maxdepth 2 -type f -name 'Godot_v*-stable_linux.*' -perm -u+x | head -n 1)"
+SOURCE_BIN="$(find "$TMP_DIR" -maxdepth 2 -type f -name 'Godot_v*-stable_linux.*' | head -n 1)"
 if [[ -z "$SOURCE_BIN" ]]; then
   echo "error: downloaded archive did not contain the expected Godot executable." >&2
   exit 1
