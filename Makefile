@@ -1,12 +1,9 @@
-.PHONY: all build-server fmt check source-sanity backend-check client-check precheck db-setup deploy install start stop restart status logs health run watch godot-install godot-editor godot-run clean
+.PHONY: all build-server fmt check source-sanity backend-check client-check precheck db-setup deploy install start stop restart status logs health run watch clean
 
 DEPLOY_DIR   := /opt/islandgame
 SERVICE_NAME := cultural-islands
 SERVER_BIN   := target/release/cultural-islands-server
-GODOT_VERSION ?= 4.7.2
-GODOT_LOCAL   := .tools/godot-$(GODOT_VERSION)/godot
-GODOT        ?= $(GODOT_LOCAL)
-GODOT_CLIENT := godot-client
+STATIC_DIR   := static
 
 all: build-server
 
@@ -28,12 +25,14 @@ source-sanity:
 	python3 tools/source_sanity.py
 
 client-check:
-	@echo "▶ Checking Godot client scripts…"
-	@test -x "$(GODOT)" || (echo "Godot not found at $(GODOT). Run: make godot-install" && exit 1)
-	$(GODOT) --headless --path $(GODOT_CLIENT) --editor --quit --check-only
+	@echo "▶ Checking PixiJS client…"
+	command -v node >/dev/null 2>&1 || (echo "Node.js is required for client syntax checks; the built client itself is served as static files." && exit 1)
+	node --check static/app.js
+	python3 tools/client_sanity.py
+	@echo "✔ PixiJS client checks passed"
 
 precheck: source-sanity fmt backend-check client-check
-	@echo "✔ Rust + Godot prechecks passed"
+	@echo "✔ Rust + PixiJS prechecks passed"
 
 # Database setup uses the existing prototype schema/seed files.
 db-setup:
@@ -43,39 +42,38 @@ db-setup:
 	psql -U jofrey -d cultural_islands -f database/002_seed.sql
 	@echo "✔ Database ready"
 
-# Backend deployment only. Godot is a separate desktop client.
 deploy: all
-	@echo "▶ Deploying backend to $(DEPLOY_DIR)…"
+	@echo "▶ Deploying backend + PixiJS client to $(DEPLOY_DIR)…"
 	@CURDIR=$$(pwd -P); DDIR=$$(realpath $(DEPLOY_DIR) 2>/dev/null || echo $(DEPLOY_DIR)); \
 	if [ "$$CURDIR" = "$$DDIR" ]; then \
 	  echo "  (repo IS the deploy dir — skipping file copy)"; \
 	else \
 	  sudo mkdir -p $(DEPLOY_DIR)/static; \
-	  sudo cp $(SERVER_BIN)  $(DEPLOY_DIR)/; \
-	  sudo cp -r static/*   $(DEPLOY_DIR)/static/; \
-	  sudo cp .env           $(DEPLOY_DIR)/; \
-	fi
-	@if [ -f deploy/cultural-islands.service ]; then \
-	  sudo cp deploy/cultural-islands.service /etc/systemd/system/$(SERVICE_NAME).service; \
-	  sudo systemctl daemon-reload; \
-	  sudo systemctl enable $(SERVICE_NAME); \
-	fi
-	sudo systemctl restart $(SERVICE_NAME)
-	@echo "✔ Backend deployed and restarted"
-
-install: all
-	@echo "▶ First-time backend install to $(DEPLOY_DIR)…"
-	sudo mkdir -p $(DEPLOY_DIR)/static
-	@CURDIR=$$(pwd -P); DDIR=$$(realpath $(DEPLOY_DIR) 2>/dev/null || echo $(DEPLOY_DIR)); \
-	if [ "$$CURDIR" != "$$DDIR" ]; then \
-	  sudo cp -r static/* $(DEPLOY_DIR)/static/; \
 	  sudo cp $(SERVER_BIN) $(DEPLOY_DIR)/; \
+	  sudo cp -r $(STATIC_DIR)/* $(DEPLOY_DIR)/static/; \
 	  [ -f .env ] && sudo cp .env $(DEPLOY_DIR)/; \
 	fi
 	@if [ -f deploy/cultural-islands.service ]; then \
-	  sudo cp deploy/cultural-islands.service /etc/systemd/system/$(SERVICE_NAME).service; \
-	  sudo systemctl daemon-reload; \
-	  sudo systemctl enable $(SERVICE_NAME); \
+		sudo cp deploy/cultural-islands.service /etc/systemd/system/$(SERVICE_NAME).service; \
+		sudo systemctl daemon-reload; \
+		sudo systemctl enable $(SERVICE_NAME); \
+	fi
+	sudo systemctl restart $(SERVICE_NAME)
+	@echo "✔ Backend + client deployed and restarted"
+
+install: all
+	@echo "▶ First-time install to $(DEPLOY_DIR)…"
+	sudo mkdir -p $(DEPLOY_DIR)/static
+	@CURDIR=$$(pwd -P); DDIR=$$(realpath $(DEPLOY_DIR) 2>/dev/null || echo $(DEPLOY_DIR)); \
+	if [ "$$CURDIR" != "$$DDIR" ]; then \
+		sudo cp -r $(STATIC_DIR)/* $(DEPLOY_DIR)/static/; \
+		sudo cp $(SERVER_BIN) $(DEPLOY_DIR)/; \
+		[ -f .env ] && sudo cp .env $(DEPLOY_DIR)/; \
+	fi
+	@if [ -f deploy/cultural-islands.service ]; then \
+		sudo cp deploy/cultural-islands.service /etc/systemd/system/$(SERVICE_NAME).service; \
+		sudo systemctl daemon-reload; \
+		sudo systemctl enable $(SERVICE_NAME); \
 	fi
 	@echo "✔ Installed. Run 'make start' to launch."
 
@@ -101,33 +99,5 @@ run:
 watch:
 	cargo watch -x 'run -p cultural-islands-server'
 
-godot-install:
-	bash tools/install_godot.sh
-
-godot-editor:
-	@if [ ! -x "$(GODOT)" ]; then \
-	  if [ -x ".tools/godot-4.7.2/godot" ]; then \
-	    echo "Using local Godot: .tools/godot-4.7.2/godot"; \
-	    .tools/godot-4.7.2/godot --editor --path $(GODOT_CLIENT); \
-	  else \
-	    echo "Godot not found. Run: make godot-install"; exit 1; \
-	  fi; \
-	else \
-	  $(GODOT) --editor --path $(GODOT_CLIENT); \
-	fi
-
-godot-run:
-	@if [ ! -x "$(GODOT)" ]; then \
-	  if [ -x ".tools/godot-4.7.2/godot" ]; then \
-	    echo "Using local Godot: .tools/godot-4.7.2/godot"; \
-	    .tools/godot-4.7.2/godot --path $(GODOT_CLIENT); \
-	  else \
-	    echo "Godot not found. Run: make godot-install"; exit 1; \
-	  fi; \
-	else \
-	  $(GODOT) --path $(GODOT_CLIENT); \
-	fi
-
 clean:
 	cargo clean
-
