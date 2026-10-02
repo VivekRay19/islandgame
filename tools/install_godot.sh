@@ -20,7 +20,7 @@ case "$(uname -s):$(uname -m)" in
     ;;
 esac
 
-BASE_URL="https://godot-releases.nbg1.your-objectstorage.com/${VERSION}-stable"
+BASE_URL="https://github.com/godotengine/godot/releases/download/${VERSION}-stable"
 URL="${BASE_URL}/${ASSET}"
 ARCHIVE="$INSTALL_ROOT/$ASSET"
 

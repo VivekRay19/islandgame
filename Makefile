@@ -102,15 +102,32 @@ watch:
 	cargo watch -x 'run -p cultural-islands-server'
 
 godot-install:
-	./tools/install_godot.sh
+	bash tools/install_godot.sh
 
 godot-editor:
-	@test -x "$(GODOT)" || (echo "Godot not found at $(GODOT). Run: make godot-install" && exit 1)
-	$(GODOT) --editor --path $(GODOT_CLIENT)
+	@if [ ! -x "$(GODOT)" ]; then \
+	  if [ -x ".tools/godot-4.7.2/godot" ]; then \
+	    echo "Using local Godot: .tools/godot-4.7.2/godot"; \
+	    .tools/godot-4.7.2/godot --editor --path $(GODOT_CLIENT); \
+	  else \
+	    echo "Godot not found. Run: make godot-install"; exit 1; \
+	  fi; \
+	else \
+	  $(GODOT) --editor --path $(GODOT_CLIENT); \
+	fi
 
 godot-run:
-	@test -x "$(GODOT)" || (echo "Godot not found at $(GODOT). Run: make godot-install" && exit 1)
-	$(GODOT) --path $(GODOT_CLIENT)
+	@if [ ! -x "$(GODOT)" ]; then \
+	  if [ -x ".tools/godot-4.7.2/godot" ]; then \
+	    echo "Using local Godot: .tools/godot-4.7.2/godot"; \
+	    .tools/godot-4.7.2/godot --path $(GODOT_CLIENT); \
+	  else \
+	    echo "Godot not found. Run: make godot-install"; exit 1; \
+	  fi; \
+	else \
+	  $(GODOT) --path $(GODOT_CLIENT); \
+	fi
 
 clean:
 	cargo clean
+
