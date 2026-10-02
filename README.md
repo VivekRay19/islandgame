@@ -7,7 +7,7 @@ Cultural Islands is a tile-based island management game built around the loop: *
 ```text
 Browser
   │
-  │ PixiJS 8.21.0 client (static assets; runtime loaded from pinned CDN URL)
+  │ PixiJS 8.22.0 client (static assets; runtime loaded from pinned CDN URL)
   ▼
 Rust / Actix Web :8067
   │
@@ -20,11 +20,11 @@ The Rust backend remains authoritative for authentication, game state, placement
 
 ## Client
 
-The game client is a browser application rendered with PixiJS 8.21.0. The current stable PixiJS API uses the async `Application.init()` flow.
+The game client is a browser application rendered with PixiJS 8.22.0. The current stable PixiJS API uses the async `Application.init()` flow.
 
 The game runs directly in a modern browser; no separate game-engine runtime is required on the server.
 
-The browser loads the pinned PixiJS 8.21.0 module from jsDelivr; your Rust server serves the game HTML, JavaScript, and CSS directly.
+The browser loads the pinned PixiJS 8.22.0 module from jsDelivr; your Rust server serves the game HTML, JavaScript, and CSS directly.
 
 ## Linux server install
 
@@ -65,3 +65,9 @@ make client-check
 ```
 
 The client itself is static at runtime; Node is needed only for local syntax checking/editing workflows.
+
+## Visual layer
+
+The current client is a game-first 2.5D/isometric presentation rather than a dashboard. The world scene uses generated island artwork plus interactive hex placement, animated selection states, a radial-style build belt, event markers, camera zoom/pan, and a compact diegetic HUD. Anime.js 4.5.0 is used for interface motion and transition choreography.
+
+Illustrated assets live in `static/assets/`; the browser does not need a separate game engine.

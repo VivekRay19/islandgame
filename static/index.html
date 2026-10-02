@@ -3,117 +3,131 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#07161f">
-  <title>Cultural Islands</title>
+  <meta name="theme-color" content="#102a24">
+  <title>Cultural Islands — Island Development & Survival</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div id="app-shell" class="shell">
-    <section id="auth-view" class="view active">
-      <div class="auth-layout">
-        <div class="brand-block">
-          <div class="brand-mark"><span></span><span></span><span></span></div>
-          <p class="eyebrow">ISLAND MANAGEMENT</p>
-          <h1>Cultural<br><em>Islands</em></h1>
-          <p class="lead">Build a thriving island, balance resources, and survive what the season throws at you.</p>
-          <div class="principles">
-            <div><strong>01</strong><span>Build with intention</span></div>
-            <div><strong>02</strong><span>Keep reserves ready</span></div>
-            <div><strong>03</strong><span>Trade when pressure rises</span></div>
+  <div id="app-shell">
+    <section id="auth-view" class="view active title-scene">
+      <div class="title-art"></div>
+      <div class="title-vignette"></div>
+      <div class="title-copy">
+        <div class="crest"><span></span><span></span><span></span></div>
+        <div class="season-mark">SEASON I · THE ARCHIPELAGO</div>
+        <h1>Cultural<br><em>Islands</em></h1>
+        <p>Build a living island. Trade before you need to. Keep water in reserve. Survive the season.</p>
+        <div class="title-loop"><span>CHOOSE</span><i></i><span>BUILD</span><i></i><span>MANAGE</span><i></i><span>RESPOND</span></div>
+      </div>
+      <div class="auth-console wood-panel">
+        <div class="console-top"><span class="rivet"></span><span class="rivet"></span><span class="console-label">ISLAND CHRONICLE</span><span class="rivet"></span><span class="rivet"></span></div>
+        <div class="auth-tabs">
+          <button class="tab-btn active" data-auth-tab="login">CONTINUE</button>
+          <button class="tab-btn" data-auth-tab="register">NEW STEWARD</button>
+        </div>
+        <form id="login-form" class="auth-form active">
+          <div class="console-heading">Return to the island</div>
+          <label>Steward name<input name="username" autocomplete="username" required></label>
+          <label>Passphrase<input name="password" type="password" autocomplete="current-password" required></label>
+          <button class="game-button primary" type="submit">ENTER THE ARCHIPELAGO <b>↗</b></button>
+        </form>
+        <form id="register-form" class="auth-form">
+          <div class="console-heading">Claim a new island</div>
+          <label>Steward name<input name="username" autocomplete="username" minlength="3" maxlength="50" required></label>
+          <label>Display name<input name="display_name" maxlength="80"></label>
+          <label>Passphrase<input name="password" type="password" autocomplete="new-password" minlength="4" required></label>
+          <button class="game-button primary" type="submit">BEGIN A NEW CHRONICLE <b>↗</b></button>
+        </form>
+        <p id="auth-error" class="console-error"></p>
+      </div>
+      <div class="title-foot">A strategic island-management game · tile by tile</div>
+    </section>
+
+    <section id="lobby-view" class="view world-lobby">
+      <div class="lobby-art"></div>
+      <div class="lobby-haze"></div>
+      <header class="lobby-top">
+        <div class="brand-ribbon"><div class="mini-crest"><span></span><span></span><span></span></div><strong>CULTURAL ISLANDS</strong><small>SEASON I</small></div>
+        <div class="profile-ribbon"><span id="profile-chip">Steward</span><button id="logout-btn" class="circle-button">↪</button></div>
+      </header>
+      <main class="lobby-world">
+        <div class="lobby-heading">
+          <span>THE CHARTER TABLE</span>
+          <h2>Choose your island, then begin.</h2>
+          <p>Each island brings a different advantage and a different danger into the season.</p>
+        </div>
+        <div class="island-choice-wheel" id="island-options"></div>
+        <div class="table-choices">
+          <div class="floating-scroll">
+            <div class="scroll-title"><span>OPEN TABLES</span><button id="refresh-games" class="small-compass">↻</button></div>
+            <div id="games-list" class="games-list"></div>
+            <div id="games-empty" class="scroll-empty">No tables are waiting.<br><b>Lay the first foundation.</b></div>
+          </div>
+          <div class="floating-scroll season-scroll">
+            <div class="scroll-title"><span>SEASON BOARD</span></div>
+            <div id="leaderboard-mini" class="leaderboard-mini"></div>
+            <div class="create-row"><label>SEATS<select id="max-players"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option></select></label><button id="create-game" class="game-button primary">CREATE TABLE +</button></div>
           </div>
         </div>
-        <div class="auth-card surface">
-          <div class="auth-tabs">
-            <button class="tab-btn active" data-auth-tab="login">Sign in</button>
-            <button class="tab-btn" data-auth-tab="register">Create account</button>
-          </div>
-          <form id="login-form" class="auth-form active">
-            <div class="section-title"><span>Welcome back</span><small>Continue your island.</small></div>
-            <label>Username<input name="username" autocomplete="username" required></label>
-            <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
-            <button class="primary-btn" type="submit">Enter the archipelago <span>→</span></button>
-          </form>
-          <form id="register-form" class="auth-form">
-            <div class="section-title"><span>Start your island</span><small>Create a local player profile.</small></div>
-            <label>Username<input name="username" autocomplete="username" minlength="3" maxlength="50" required></label>
-            <label>Display name<input name="display_name" maxlength="80"></label>
-            <label>Password<input name="password" type="password" autocomplete="new-password" minlength="4" required></label>
-            <button class="primary-btn" type="submit">Create profile <span>→</span></button>
-          </form>
-          <p id="auth-error" class="form-error"></p>
+      </main>
+      <div id="join-modal" class="modal-backdrop hidden">
+        <div class="wood-panel join-scroll">
+          <button id="join-close" class="close-button">×</button>
+          <div class="scroll-title"><span>JOIN THIS TABLE</span></div>
+          <div id="join-islands" class="join-islands"></div>
+          <button id="join-confirm" class="game-button primary">JOIN TABLE ↗</button>
         </div>
       </div>
     </section>
 
-    <section id="lobby-view" class="view">
-      <header class="topbar">
-        <div class="brand-small"><div class="brand-mark mini"><span></span><span></span><span></span></div><strong>Cultural Islands</strong></div>
-        <div class="topbar-actions"><span id="profile-chip" class="profile-chip"></span><button id="logout-btn" class="ghost-btn">Sign out</button></div>
-      </header>
-      <main class="lobby-layout">
-        <section class="hero-panel">
-          <div>
-            <p class="eyebrow">THE ARCHIPELAGO</p>
-            <h2>Choose your next island.</h2>
-            <p>Join an active table or create one. Every island starts with a different advantage and a different risk.</p>
-          </div>
-          <div class="hero-stats"><div><strong>6</strong><span>Rounds</span></div><div><strong>4</strong><span>Islands</span></div><div><strong>8</strong><span>Resources</span></div></div>
-        </section>
-        <section class="content-grid">
-          <div class="surface panel games-panel">
-            <div class="panel-head"><div><h3>Open tables</h3><p>Pick a game already forming.</p></div><button id="refresh-games" class="icon-btn" aria-label="Refresh games">↻</button></div>
-            <div id="games-list" class="games-list"></div>
-            <div class="empty-state" id="games-empty"><div class="empty-orb"></div><strong>No open tables</strong><span>Create the first island and invite others.</span></div>
-          </div>
-          <aside class="right-stack">
-            <div class="surface panel create-panel">
-              <div class="panel-head"><div><h3>Create an island</h3><p>Your starting specialty shapes the first rounds.</p></div></div>
-              <div id="island-options" class="island-options"></div>
-              <label class="compact-label">Players<select id="max-players"><option value="2">2 players</option><option value="3">3 players</option><option value="4" selected>4 players</option></select></label>
-              <button id="create-game" class="primary-btn">Create table <span>+</span></button>
-            </div>
-            <div class="surface panel board-panel">
-              <div class="panel-head"><div><h3>Season board</h3><p>Current season standings.</p></div></div>
-              <div id="leaderboard-mini" class="leaderboard-mini"></div>
-            </div>
-          </aside>
-        </section>
-      </main>
-    </section>
+    <section id="game-view" class="view game-scene">
+      <div id="pixi-root" class="pixi-root"></div>
+      <div class="game-shade"></div>
 
-    <section id="game-view" class="view game-view">
-      <header class="gamebar">
-        <div class="gamebar-left"><button id="back-lobby" class="ghost-btn">← Tables</button><div class="game-code"><span>TABLE</span><strong id="game-code">——</strong></div></div>
-        <div class="turn-pill"><span>ROUND</span><strong id="round-label">1</strong><small id="turn-label">Your turn</small></div>
-        <div class="resource-strip" id="resource-strip"></div>
+      <header class="hud-top">
+        <div class="hud-cluster left">
+          <button id="back-lobby" class="hud-round" title="Return to table">↩</button>
+          <div class="island-seal"><div class="seal-art">◈</div><div><span id="island-title">Forest Island</span><small>TABLE <b id="game-code">----</b></small></div></div>
+        </div>
+        <div class="round-medallion"><span>ROUND</span><strong id="round-label">1</strong><small id="turn-label">YOUR TURN</small></div>
+        <div class="hud-cluster right" id="resource-strip"></div>
       </header>
-      <main class="game-layout">
-        <section class="board-shell surface">
-          <div class="board-toolbar"><div><p class="eyebrow">YOUR ISLAND</p><h2 id="island-title">Island</h2></div><div class="board-help" id="board-help">Select Build to add your next tile.</div><div class="board-actions"><button id="zoom-out" class="icon-btn">−</button><button id="zoom-reset" class="icon-btn">•</button><button id="zoom-in" class="icon-btn">+</button></div></div>
-          <div id="pixi-host" class="pixi-host"></div>
-          <div id="board-overlay" class="board-overlay"></div>
-        </section>
-        <aside class="game-sidebar">
-          <div id="event-card" class="surface event-card hidden"></div>
-          <div class="surface action-panel">
-            <div class="action-tabs"><button data-action-tab="build" class="action-tab active">Build</button><button data-action-tab="trade" class="action-tab">Trade</button><button data-action-tab="tasks" class="action-tab">Tasks</button></div>
-            <div id="build-panel" class="action-content"></div>
-            <div id="trade-panel" class="action-content"></div>
-            <div id="tasks-panel" class="action-content"></div>
-          </div>
-          <div class="surface log-panel"><div class="panel-head slim"><h3>Island log</h3><span id="sync-status">Live</span></div><div id="action-log" class="action-log"></div></div>
-        </aside>
-      </main>
-      <footer class="turnbar"><div class="turn-summary"><span id="turn-summary-label">Your turn</span><small id="turn-summary-hint">Build, trade, resolve an event, then continue.</small></div><div class="turn-controls"><button id="cancel-build" class="ghost-btn hidden">Cancel build</button><button id="start-game" class="ghost-btn hidden">Start game</button><button id="end-turn" class="primary-btn">End turn <span>→</span></button></div></footer>
+
+      <aside class="quest-ribbon" id="quest-ribbon">
+        <div class="ribbon-pin">◆</div>
+        <div class="quest-caption">CURRENT CHARTER</div>
+        <strong id="quest-title">Build your island.</strong>
+        <span id="quest-subtitle">Complete development goals and survive the season.</span>
+      </aside>
+
+      <div id="event-card" class="event-scroll hidden"></div>
+
+      <div class="build-whisper" id="build-whisper">Choose a blueprint below.</div>
+      <div id="build-wheel" class="build-wheel"></div>
+
+      <div class="action-dock">
+        <button class="dock-button active" data-action-tab="build"><span>⚒</span><small>BUILD</small></button>
+        <button class="dock-button" data-action-tab="trade"><span>⇄</span><small>TRADE</small></button>
+        <button class="dock-button" data-action-tab="tasks"><span>✦</span><small>GOALS</small></button>
+      </div>
+
+      <div id="side-panel" class="side-panel hidden">
+        <div class="side-head"><div><span id="side-kicker">BUILD</span><strong id="side-title">Blueprints</strong></div><button id="side-close" class="close-button">×</button></div>
+        <div id="side-content"></div>
+      </div>
+
+      <button id="end-turn" class="end-turn" title="End your turn"><span>END</span><strong>TURN</strong><i>↗</i></button>
+      <button id="start-game" class="start-game hidden">BEGIN SEASON</button>
+      <button id="cancel-build" class="cancel-build hidden">CANCEL</button>
+
+      <div class="camera-tools">
+        <button id="zoom-out" class="hud-round">−</button>
+        <button id="zoom-reset" class="hud-round">◈</button>
+        <button id="zoom-in" class="hud-round">+</button>
+      </div>
+      <div id="sync-status" class="sync-status">SYNCING…</div>
+      <div id="toast-root" class="toast-root"></div>
     </section>
-  </div>
-  <div id="toast-root" class="toast-root"></div>
-  <div id="join-modal" class="modal-backdrop hidden">
-    <div class="modal-card surface">
-      <div class="panel-head"><div><p class="eyebrow">JOIN TABLE</p><h3>Choose your island</h3><p>Bring a different starting specialty into this game.</p></div><button id="join-close" class="icon-btn">×</button></div>
-      <div id="join-islands" class="island-options"></div>
-      <button id="join-confirm" class="primary-btn">Join table <span>→</span></button>
-    </div>
   </div>
   <script type="module" src="/app.js"></script>
 </body>
