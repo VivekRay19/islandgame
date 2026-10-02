@@ -1,156 +1,142 @@
-# Cultural Islands — Setup & Deploy Guide
-**Server: 192.168.8.10 | HTTP: 8067 | WS: 8068**
+# Cultural Islands — Godot + Rust Rebuild
 
----
+The browser/legacy browser engine client is gone. This repository now contains:
 
-## Quick start (server already running)
+- `game-server/`: the existing Rust backend and game rules.
+- `godot-client/`: the redesigned Godot 4 client.
+- `database/`: the existing PostgreSQL schema/seed data.
+- `deploy/`: the existing systemd service definition.
+- `static/`: only the backend's small HTTP landing page; it is not the game client.
 
-If the service is already installed and the DB is set up, just run:
+The Rust backend remains authoritative for game state, turn order, resources, tile placement, events, trade, tasks and scoring. The Godot client is a presentation/input layer over that API.
+
+## Requirements
+
+Use **Godot 4.7.2 stable** for the client. Godot 4.7.2 is the stable 4.7 maintenance release.
+
+For the backend you need the normal Rust toolchain (`cargo`, `rustc`, `rustfmt`) and PostgreSQL.
+
+## 1. Install / build the Rust backend
+
+From the repository root:
+
 ```bash
-make deploy-client        # push JS changes live instantly
-make restart              # restart server if needed
-make logs                 # tail live logs
+cargo build --release -p cultural-islands-server
 ```
 
----
+Or use the existing Makefile:
 
-## First-time setup
-
-### 1. Prerequisites
-```bash
-# Rust toolchain
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
-```
-
-### 2. Database
-```bash
-make db-setup
-# Creates: cultural_islands DB, all tables, seeds season 1 + story events
-```
-
-### 3. Download Phaser 3 (one time, needs internet)
-```bash
-make download-phaser
-# Saves phaser.min.js to static/ — no internet needed after this
-```
-
-### 4. Build the Rust server
 ```bash
 make build-server
 ```
 
-### 5. Full deploy (copies files + starts service)
+For the first database setup, using the existing prototype schema:
+
 ```bash
-make deploy
+make db-setup
 ```
 
-### 6. Open the game
-Any browser on the LAN: **http://192.168.8.10:8067**
+Configure `.env` (or copy `.env.example` to `.env`) with the database/server settings before starting.
 
----
+## 2. Start the Rust backend
 
-## Directory structure
+Development:
 
-```
-IslandGame/
-├── game-server/          Rust API server (Actix-web)
-│   └── src/
-│       ├── handlers/     auth, game, leaderboard, campaign
-│       ├── game_logic/   hex grid, tiles, events, trade, scoring
-│       ├── models/       DB structs
-│       └── ws/           WebSocket handler (port 8068)
-├── static/               JS game client (edit these files)
-│   ├── index.html        loading splash + Phaser boot
-│   ├── phaser.min.js     local Phaser 3 (downloaded once)
-│   └── js/
-│       ├── main.js       Phaser config + scene list
-│       ├── config.js     tile defs, resource colours, API URL
-│       ├── api.js        all HTTP calls to Rust server
-│       ├── scenes/       one file per game screen
-│       │   ├── BootScene.js
-│       │   ├── MenuScene.js
-│       │   ├── LoginScene.js
-│       │   ├── LobbyScene.js
-│       │   ├── GameScene.js
-│       │   ├── ResultsScene.js
-│       │   └── LeaderboardScene.js
-│       ├── game/         board rendering + HUD components
-│       │   ├── HexBoard.js
-│       │   ├── HUD.js
-│       │   ├── EventPanel.js
-│       │   └── TilePicker.js
-│       └── ui/           reusable CoC-style UI primitives
-│           ├── Colors.js
-│           ├── Button.js
-│           ├── Panel.js
-│           └── TextInput.js
-├── database/
-│   ├── 001_schema.sql    all 18 tables
-│   └── 002_seed.sql      season 1 + story events
-└── deploy/
-    └── cultural-islands.service   systemd unit
-```
-
----
-
-## Editing the JS client
-
-No build step — edit, save, refresh:
-
-| File | What to change |
-|------|----------------|
-| `static/js/config.js` | API URL, tile definitions, resource colours |
-| `static/js/api.js` | Add or change API calls |
-| `static/js/scenes/GameScene.js` | Main game screen layout & interactions |
-| `static/js/game/HexBoard.js` | Hex tile rendering & grid logic |
-| `static/js/ui/Colors.js` | Colour palette |
-
-After editing, push to server:
 ```bash
-make deploy-client
+make run
 ```
 
----
+Installed/systemd deployment:
 
-## API reference
+```bash
+make install
+make start
+make status
+```
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | /api/auth/register | Create account |
-| POST | /api/auth/login | Login |
-| GET  | /api/auth/me | Current player info |
-| GET  | /api/games | List open games |
-| POST | /api/games | Create game |
-| POST | /api/games/:id/join | Join a game |
-| POST | /api/games/:id/start | Start (host only) |
-| GET  | /api/games/:id/state | Full game state |
-| POST | /api/games/:id/place-tile | Place a hex tile |
-| POST | /api/games/:id/respond-event | Handle event |
-| POST | /api/games/:id/trade | Haat trade |
-| POST | /api/games/:id/complete-task | Complete development task |
-| POST | /api/games/:id/end-turn | End your turn |
-| GET  | /api/leaderboard | Season rankings |
-| GET  | /api/campaign | Campaign progress |
-| WS   | ws://192.168.8.10:8068/ws?game_id=UUID | Live game events |
+Health check:
 
----
+```bash
+make health
+```
 
-## Browser compatibility
+The REST API defaults to port `8067`; the existing WebSocket endpoint uses `8068`.
 
-Phaser 3 uses **WebGL with automatic Canvas 2D fallback**.
-Works on: Chrome 80+, Firefox 78+, Safari 14+, Edge 80+, any Android/iOS browser.
-No TypeScript, no npm, no build step.
+## 3. Configure the Godot client
 
----
+The client reads its API root from `CI_API_BASE`. The default is the existing backend address:
 
-## Game rules summary
+```text
+http://192.168.8.10:8067/api
+```
 
-- **6 Rounds**, 3 Levels (L1: rounds 1-2, L2: 3-4, L3: 5-6)
-- **Turn order**: Respond to event → Build tile → Haat Trade → Complete Task → End Turn
-- **Tile placement**: Must connect to your island (hex adjacency)
-- **Edge matching**: +15 pts per matched edge, +25 bonus if all neighbours match
-- **8 Resources**: grain, fibre, wood, stone, clay, water, music, ore
-- **5 Traders** at the Haat Market (max 2 trades per round)
-- **Events**: Fire & Drought (cost 2 water), Festival & Harvest (free), Storm
-- **Win**: highest total of Task Score + Event Score + Cultural Harmony ÷ 10
+Linux/macOS:
+
+```bash
+export CI_API_BASE=http://YOUR_SERVER:8067/api
+```
+
+Windows PowerShell:
+
+```powershell
+$env:CI_API_BASE = "http://YOUR_SERVER:8067/api"
+```
+
+The client uses the backend over HTTP; no backend source needs to be moved into Godot.
+
+## 4. Open/run Godot
+
+From the repository root:
+
+```bash
+make godot-editor
+```
+
+Or run the game directly:
+
+```bash
+make godot-run
+```
+
+You can also open `godot-client/project.godot` in the Godot editor.
+
+## 5. Run the complete precheck
+
+The repository includes a reproducible source precheck:
+
+```bash
+./tools/precheck.sh
+```
+
+It runs:
+
+1. the repository source-sanity checker (balanced source, Godot references, top-level unused-variable scan, and legacy-client scan)
+2. `cargo fmt --all -- --check`
+3. `cargo check --workspace --all-targets`
+4. Godot's headless script/project parser
+5. the final project-tree sanity check
+
+The sandbox used to prepare this archive does **not** contain `cargo`, `rustc`, `rustfmt`, or the Godot executable, so compiler-level execution could not be truthfully claimed there. The archive was instead checked structurally/source-wise here, and `tools/precheck.sh` is the exact compiler/parser check to run on the server/workstation before deployment.
+
+## 6. Game-client structure
+
+```text
+godot-client/
+├── project.godot
+├── Main.tscn
+├── DESIGN.md
+├── run_godot.sh
+├── run_godot.bat
+└── scripts/
+    ├── main.gd
+    ├── api_client.gd
+    ├── board.gd
+    ├── data.gd
+    └── theme.gd
+```
+
+The UI is organized around the rulebook loop: **Choose → Build → Manage → Trade → Respond → Continue**. The board is the central decision surface; resources remain visible; build mode exposes legal neighbouring cells; events get priority treatment; and Trade/Tasks are explicit action contexts.
+
+## 7. Important: backend is intentionally preserved
+
+Do not replace `game-server/` with a second game implementation inside Godot. The client sends requests to the existing Rust API and displays the resulting authoritative state.
