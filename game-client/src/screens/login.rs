@@ -21,7 +21,7 @@ pub enum LoginAction {
 
 pub fn update_input(text: &mut String) {
     if let Some(c) = get_char_pressed() {
-        if c != '\u{8}' && c != '\r' && c != '\n' { text.push(c); }
+        if !c.is_control() && text.len() < 64 { text.push(c); }
     }
     if is_key_pressed(KeyCode::Backspace) { text.pop(); }
 }

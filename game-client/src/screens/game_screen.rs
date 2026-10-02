@@ -53,6 +53,7 @@ pub enum GameAction {
     Trade         { trader_id: String },
     CompleteTask  { task_id: String },
     EndTurn,
+    StartGame,
     Leave,
     PollState,
 }
@@ -60,7 +61,7 @@ pub enum GameAction {
 // ── Hex coord → screen ───────────────────────────────────────────────────────
 const HEX_R:     f32 = 44.0;
 const HEX_SPC_X: f32 = 76.0;
-const HEX_SPC_Y: f32 = 46.0;
+const HEX_SPC_Y: f32 = 42.0;
 
 fn hex_to_screen(q: i32, r: i32, origin_x: f32, origin_y: f32) -> (f32, f32) {
     (
@@ -69,18 +70,15 @@ fn hex_to_screen(q: i32, r: i32, origin_x: f32, origin_y: f32) -> (f32, f32) {
     )
 }
 
-fn screen_to_hex(mx: f32, my: f32, origin_x: f32, origin_y: f32) -> (i32, i32) {
-    let r_approx = (my - origin_y) / HEX_SPC_Y;
-    let q_approx = (mx - origin_x - r_approx * HEX_SPC_X / 2.0) / HEX_SPC_X;
-    let r = r_approx.round() as i32;
-    let q = q_approx.round() as i32;
-    (q, r)
+/// Normalised elliptical distance from a hex centre (< 1.0 means inside).
+fn hex_dist(mx: f32, my: f32, cx: f32, cy: f32) -> f32 {
+    let dx = (mx - cx) / (HEX_R * 0.866);
+    let dy = (my - cy) / (HEX_R * 0.60);
+    dx * dx + dy * dy
 }
 
 fn point_in_hex(mx: f32, my: f32, cx: f32, cy: f32) -> bool {
-    let dx = (mx - cx).abs();
-    let dy = (my - cy).abs();
-    dx < HEX_R * 0.88 && dy < HEX_R * 0.55
+    hex_dist(mx, my, cx, cy) < 1.0
 }
 
 fn get_valid_slots(tiles: &[HexTile]) -> Vec<(i32,i32)> {
@@ -136,27 +134,44 @@ pub fn draw_game(
              player_name);
 
     // ── Island board ─────────────────────────────────────────────────────
-    let _board_w = sw * 0.60;
-    let origin_x = sw * 0.08 + s.camera_offset.0;
-    let origin_y = sh * 0.42 + s.camera_offset.1;
+    // Centre the island in the area left of the right-hand panel (0.67*sw).
+    let origin_x = sw * 0.335 + s.camera_offset.0;
+    let origin_y = sh * 0.46  + s.camera_offset.1;
     let (mx, my) = mouse_position();
+
+    // Hover state is recomputed every frame (a stale value used to let a click
+    // anywhere place a tile on the last slot the mouse had touched).
+    s.hovered_q = None;
+    s.hovered_r = None;
 
     // Valid slots
     let slots = get_valid_slots(&my_island.tiles);
-    let (hq, hr) = screen_to_hex(mx, my, origin_x, origin_y);
+
+    // Closest slot under the mouse
+    let mut hovered_slot: Option<(i32, i32)> = None;
+    if s.selected_tile.is_some() && is_my_turn {
+        let mut best = 1.0f32;
+        for &(sq, sr) in &slots {
+            let (cx, cy) = hex_to_screen(sq, sr, origin_x, origin_y);
+            let d = hex_dist(mx, my, cx, cy);
+            if d < best { best = d; hovered_slot = Some((sq, sr)); }
+        }
+        if let Some((hq, hr)) = hovered_slot { s.hovered_q = Some(hq); s.hovered_r = Some(hr); }
+    }
 
     // Draw slots first (behind tiles)
     if s.selected_tile.is_some() && is_my_turn {
         for &(sq, sr) in &slots {
             let (cx, cy) = hex_to_screen(sq, sr, origin_x, origin_y);
-            let hovered  = hq==sq && hr==sr && point_in_hex(mx,my,cx,cy);
-            if hovered { s.hovered_q = Some(sq); s.hovered_r = Some(sr); }
-            draw_hex_slot(cx, cy, HEX_R * 0.90, hovered);
+            draw_hex_slot(cx, cy, HEX_R * 0.90, hovered_slot == Some((sq, sr)));
         }
     }
 
-    // Draw placed tiles
-    for tile in &my_island.tiles {
+    // Draw placed tiles back-to-front (top rows first) so the 3-D side walls
+    // of one tile are covered by the tile in front of it.
+    let mut ordered: Vec<&HexTile> = my_island.tiles.iter().collect();
+    ordered.sort_by_key(|t| (t.r, t.q));
+    for tile in ordered {
         let (cx, cy) = hex_to_screen(tile.q, tile.r, origin_x, origin_y);
         let sel = s.selected_tile.is_none() &&
             s.hovered_q == Some(tile.q) && s.hovered_r == Some(tile.r);
@@ -176,18 +191,17 @@ pub fn draw_game(
 
     // Hover highlight for placed tiles (no tile selected)
     if s.selected_tile.is_none() {
+        let mut best = 1.0f32;
         for tile in &my_island.tiles {
             let (cx, cy) = hex_to_screen(tile.q, tile.r, origin_x, origin_y);
-            if point_in_hex(mx, my, cx, cy) {
-                s.hovered_q = Some(tile.q);
-                s.hovered_r = Some(tile.r);
-            }
+            let d = hex_dist(mx, my, cx, cy);
+            if d < best { best = d; s.hovered_q = Some(tile.q); s.hovered_r = Some(tile.r); }
         }
     }
 
     // ── Right panel ───────────────────────────────────────────────────────
-    let rp_x = sw * 0.67;
-    let rp_w = sw * 0.30;
+    let rp_w = (sw * 0.30).max(250.0).min(sw - 16.0);
+    let rp_x = (sw * 0.67).min(sw - rp_w - 8.0);
     let rp_y = 65.0;
 
     // Turn info
@@ -205,7 +219,7 @@ pub fn draw_game(
         let ep_y = rp_y + 88.0;
         draw_panel(rp_x, ep_y, rp_w, 120.0);
         draw_rectangle(rp_x, ep_y, rp_w, 28.0, Color { r:0.65,g:0.08,b:0.02,a:0.85 });
-        draw_text_centered("⚠  ACTIVE EVENT", rp_x+rp_w/2.0, ep_y+18.0, 15.0, WHITE);
+        draw_text_centered("! ACTIVE EVENT !", rp_x+rp_w/2.0, ep_y+18.0, 15.0, WHITE);
         let ev_name = match ev.event_id.as_str() {
             "fire_event"     => "FIRE at tile!",
             "festival_event" => "FESTIVAL TIME!",
@@ -236,26 +250,36 @@ pub fn draw_game(
 
     // Action buttons
     let ab_y = rp_y + (if my_island.active_event.is_some() { 218.0 } else { 96.0 });
+    // Host can start the game while it is still in round 1 and not yet started
+    let started = gs.action_log.iter().any(|l| l.contains("Game started"));
+    let i_am_host = gs.player_order.first().map(|p| p == &my_island.player_id).unwrap_or(false);
+    if i_am_host && !started && gs.round == 1 {
+        let pulse = 0.85 + 0.15 * (t * 4.0).sin();
+        let c = Color { r: GREEN_BTN.r*pulse, g: GREEN_BTN.g*pulse, b: GREEN_BTN.b*pulse, a: 1.0 };
+        if button(&format!("START GAME ({} joined)", gs.player_order.len()), rp_x+4.0, ab_y + 226.0, rp_w-8.0, 44.0, c) {
+            action = GameAction::StartGame;
+        }
+    }
     if is_my_turn {
-        if button("⚖  HAAT TRADE", rp_x+4.0, ab_y, rp_w-8.0, 40.0, BLUE_BTN) {
+        if button("HAAT TRADE", rp_x+4.0, ab_y, rp_w-8.0, 40.0, BLUE_BTN) {
             s.show_trade = !s.show_trade;
             s.show_tasks = false;
         }
-        if button("📜  TASKS", rp_x+4.0, ab_y+48.0, rp_w-8.0, 40.0, PANEL_MID) {
+        if button("TASKS", rp_x+4.0, ab_y+48.0, rp_w-8.0, 40.0, PANEL_MID) {
             s.show_tasks = !s.show_tasks;
             s.show_trade = false;
         }
-        if button("⏩  END TURN", rp_x+4.0, ab_y+96.0, rp_w-8.0, 44.0, RED_BTN) {
+        if button("END TURN", rp_x+4.0, ab_y+96.0, rp_w-8.0, 44.0, RED_BTN) {
             action = GameAction::EndTurn;
         }
     }
-    if button("📖  Rules", rp_x+4.0, ab_y+148.0, rp_w-8.0, 32.0, PANEL_MID) {
+    if button("Rules", rp_x+4.0, ab_y+148.0, rp_w-8.0, 32.0, PANEL_MID) {
         s.show_rules = !s.show_rules;
     }
-    if button("🚪  Leave", rp_x+4.0, ab_y+188.0, rp_w/2.0-6.0, 28.0, RED_BTN) {
+    if button("Leave", rp_x+4.0, ab_y+188.0, rp_w/2.0-6.0, 28.0, RED_BTN) {
         action = GameAction::Leave;
     }
-    if button("🔄 Refresh", rp_x + rp_w/2.0+2.0, ab_y+188.0, rp_w/2.0-6.0, 28.0, BLUE_BTN) {
+    if button("Refresh", rp_x + rp_w/2.0+2.0, ab_y+188.0, rp_w/2.0-6.0, 28.0, BLUE_BTN) {
         action = GameAction::PollState;
     }
 
@@ -286,7 +310,7 @@ pub fn draw_game(
             }
         }
         // Rotation control
-        draw_text_shadow(&format!("Rotate: {}°", s.selected_rotation),
+        draw_text_shadow(&format!("Rotate: {} deg", s.selected_rotation),
             start_x - 100.0, sh - picker_h/2.0 + 6.0, 14.0, GOLD_TEXT);
         if button("<", start_x-100.0, sh - picker_h + 24.0, 28.0, 28.0, PANEL_MID) {
             s.selected_rotation = (s.selected_rotation + 300) % 360;
@@ -330,8 +354,9 @@ pub fn draw_game(
             let want_q = trader["requested_qty"].as_i64().unwrap_or(0);
             let tid    = trader["id"].as_str().unwrap_or("").to_string();
 
-            draw_text_shadow(&format!("{} {}  ⟶  give {} {} → get {} {}",
-                avatar, name, want_q, want_r, offer_q, offer_r),
+            let _ = avatar; // server sends emoji avatars; the built-in font can't draw them
+            draw_text_shadow(&format!("{}: give {} {}  ->  get {} {}",
+                name, want_q, want_r, offer_q, offer_r),
                 ox+18.0, ty+20.0, 14.0, WHITE);
             let player_has = my_island.resources.get(want_r);
             let can_trade  = player_has >= want_q as i32 && my_island.trades_this_round < 2;
@@ -363,9 +388,9 @@ pub fn draw_game(
             let tid   = task["id"].as_str().unwrap_or("").to_string();
             let done  = my_island.completed_tasks.contains(&tid);
 
-            draw_text_shadow(&format!("{} — {} pts", name, pts), ox+18.0, ty+22.0, 14.0, WHITE);
+            draw_text_shadow(&format!("{} - {} pts", name, pts), ox+18.0, ty+22.0, 14.0, WHITE);
             if done {
-                draw_text_shadow("✅ DONE", ox+ow-90.0, ty+22.0, 14.0, GREEN_BTN);
+                draw_text_shadow("DONE", ox+ow-90.0, ty+22.0, 14.0, GREEN_BTN);
             } else if button("BUILD", ox+ow-100.0, ty+8.0, 82.0, 32.0, GREEN_BTN) {
                 action = GameAction::CompleteTask { task_id: tid };
                 s.show_tasks = false;
@@ -384,17 +409,17 @@ pub fn draw_game(
         let oy = sh/2.0 - oh/2.0;
         draw_panel_titled(ox, oy, ow, oh, "  Game Rules");
         let rules = [
-            "• 6 Rounds total, divided into 3 Levels (2 rounds each).",
-            "• Each round: Respond to Event → Build → Trade → Complete Task → End Turn.",
-            "• Tiles must connect to your existing island (hex adjacency).",
-            "• Matching tile edges with neighbours earns bonus points (+15 each).",
-            "• 2+ edges matched: +25 bonus!",
-            "• Resources are produced each turn from your tiles.",
-            "• Max 2 Haat Trades per round.",
-            "• Fire/Drought needs Water to extinguish (2 units).",
-            "• Festival and Harvest events give free resources.",
-            "• Cultural Harmony affects final score (/10 bonus points).",
-            "• Highest total score (Tasks + Events + Harmony) wins!",
+            "* 6 Rounds total, divided into 3 Levels (2 rounds each).",
+            "* Each round: Respond to Event > Build > Trade > Complete Task > End Turn.",
+            "* Tiles must connect to your existing island (hex adjacency).",
+            "* Matching tile edges with neighbours earns bonus points (+15 each).",
+            "* 2+ edges matched: +25 bonus!",
+            "* Resources are produced each turn from your tiles.",
+            "* Max 2 Haat Trades per round.",
+            "* Fire/Drought needs Water to extinguish (2 units).",
+            "* Festival and Harvest events give free resources.",
+            "* Cultural Harmony affects final score (/10 bonus points).",
+            "* Highest total score (Tasks + Events + Harmony) wins!",
         ];
         for (i, r) in rules.iter().enumerate() {
             draw_text_shadow(r, ox+16.0, oy+50.0 + i as f32*34.0, 14.0, STONE_LIGHT);

@@ -25,7 +25,7 @@ pub fn draw_hud(res: &Resources, round: i32, max_round: i32,
         ("ORE", res.ore,   RES_ORE),
     ];
     for (i,(label, count, color)) in pills.iter().enumerate() {
-        draw_resource_pill(label, *count, 8.0 + i as f32 * 74.0, 8.0, 70.0, 40.0, *color);
+        draw_resource_pill(label, *count, 8.0 + i as f32 * 72.0, 8.0, 68.0, 40.0, *color);
     }
 
     // ── Centre: round + harmony ───────────────────────────────────────────
@@ -42,17 +42,17 @@ pub fn draw_hud(res: &Resources, round: i32, max_round: i32,
     draw_text_centered(&format!("Harmony {}", harmony), cx, 45.0, 12.0, STONE_LIGHT);
 
     // ── Right: player + event alert ───────────────────────────────────────
-    let rx = sw - 240.0;
+    let rx = (sw - 240.0).max(8.0 + 8.0 * 72.0 + 190.0);
     draw_text_shadow(player_name, rx, 22.0, 17.0, GOLD_TEXT);
 
     if let Some(ev) = active_event {
         let label = match ev.event_id.as_str() {
-            "fire_event"     => "🔥 FIRE — Use water!",
-            "festival_event" => "🎉 FESTIVAL!",
-            "harvest_bounty" => "🌾 HARVEST!",
-            "drought"        => "☀️ DROUGHT!",
-            "storm"          => "⛈️ STORM!",
-            _                => "⚠️ EVENT!",
+            "fire_event"     => "FIRE - use water!",
+            "festival_event" => "FESTIVAL!",
+            "harvest_bounty" => "HARVEST!",
+            "drought"        => "DROUGHT!",
+            "storm"          => "STORM!",
+            _                => "EVENT!",
         };
         // Pulsing alert box
         let t       = get_time() as f32;

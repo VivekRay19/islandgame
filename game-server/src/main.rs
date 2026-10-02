@@ -41,6 +41,26 @@ async fn main() -> std::io::Result<()> {
     let ws_bind   = format!("{}:{}", cfg.host, cfg.ws_port);
     let static_dir = cfg.static_dir.clone();
 
+    // Make it obvious which directory is being served. A wrong STATIC_DIR (or a
+    // stray Vite-style index.html) is the classic cause of a blank page + 404 on /src/main.ts.
+    match std::fs::canonicalize(&static_dir) {
+        Ok(p) => tracing::info!("  Static → {}", p.display()),
+        Err(e) => tracing::error!("  Static dir '{}' is not accessible: {}", static_dir, e),
+    }
+    let index_path = std::path::Path::new(&static_dir).join("index.html");
+    match std::fs::read_to_string(&index_path) {
+        Ok(html) if html.contains("/src/main.ts") => tracing::error!(
+            "  {} references /src/main.ts (a Vite page) - replace it with the Macroquad loader page!",
+            index_path.display()),
+        Ok(_) => {}
+        Err(e) => tracing::error!("  Cannot read {}: {}", index_path.display(), e),
+    }
+    for f in ["gl.js", "sapp_jsutils.js", "quad-net.js", "cultural_islands_client.wasm"] {
+        if !std::path::Path::new(&static_dir).join(f).exists() {
+            tracing::warn!("  Missing static file: {}/{}", static_dir, f);
+        }
+    }
+
     let data = web::Data::new(AppState { db: pool, config: cfg });
 
     HttpServer::new(move || {
@@ -61,6 +81,9 @@ async fn main() -> std::io::Result<()> {
             }))
             .wrap(cors)
             .wrap(middleware::Logger::default())
+            // Always revalidate: a stale cached index.html / .wasm after a redeploy
+            // is another way to end up with a blank screen.
+            .wrap(middleware::DefaultHeaders::new().add(("Cache-Control", "no-cache")))
             // ── Health Check ───────────────────────────────────
             .route("/health", web::get().to(|| async {
                 actix_web::HttpResponse::Ok().json(serde_json::json!({

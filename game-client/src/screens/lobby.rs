@@ -32,10 +32,10 @@ impl Default for LobbyState {
 
 const MODES:   [&str; 2] = ["Turn-Based", "Real-Time"];
 const ISLANDS: [(&str, &str, &str); 4] = [
-    ("farming",  "🌾 Farming",  "Starts with Grain"),
-    ("forest",   "🪵 Forest",   "Starts with Wood"),
-    ("coastal",  "💧 Coastal",  "Starts with Water"),
-    ("mountain", "🪨 Mountain", "Starts with Stone"),
+    ("farming",  "Farming",  "Starts with Grain"),
+    ("forest",   "Forest",   "Starts with Wood"),
+    ("coastal",  "Coastal",  "Starts with Water"),
+    ("mountain", "Mountain", "Starts with Stone"),
 ];
 
 pub fn draw_lobby(s: &mut LobbyState, t: f32) -> LobbyAction {
@@ -57,15 +57,20 @@ pub fn draw_lobby(s: &mut LobbyState, t: f32) -> LobbyAction {
     let py = sh*0.10;
     draw_panel_titled(px, py, pw, ph, "  Game Lobby");
 
+    let mut want_refresh = false;
     // Tabs
     for (i, label) in ["Create Game","Join Game","Browse"].iter().enumerate() {
         let tx = px + 10.0 + i as f32 * (pw/3.0 - 6.0);
         let col = if s.tab == i { GOLD_DARK } else { PANEL_MID };
-        if button(label, tx, py+36.0, pw/3.0 - 10.0, 30.0, col) { s.tab = i; }
+        if button(label, tx, py+36.0, pw/3.0 - 10.0, 30.0, col) {
+            if i == 2 && s.tab != 2 { want_refresh = true; }
+            s.tab = i;
+        }
     }
     let content_y = py + 80.0;
 
     let mut action = LobbyAction::None;
+    if want_refresh { action = LobbyAction::Refresh; }
 
     match s.tab {
         0 => {
@@ -110,7 +115,7 @@ pub fn draw_lobby(s: &mut LobbyState, t: f32) -> LobbyAction {
             if mouse_in(lx, content_y+30.0, pw-40.0, 42.0) && is_mouse_button_pressed(MouseButton::Left) {}
             if is_key_pressed(KeyCode::Backspace) { s.join_code.pop(); }
             if let Some(c) = get_char_pressed() {
-                if c != '\u{8}' && s.join_code.len() < 6 {
+                if c.is_ascii_alphanumeric() && s.join_code.len() < 6 {
                     s.join_code.push(c.to_ascii_uppercase());
                 }
             }

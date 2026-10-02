@@ -11,7 +11,6 @@ target/
 
 # Generated WASM & downloaded JS bundle
 static/*.wasm
-static/mq_js_bundle.js
 
 # Node / Frontend Bundler Outputs
 node_modules/

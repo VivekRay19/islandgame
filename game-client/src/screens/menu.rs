@@ -43,12 +43,12 @@ pub fn draw_menu(t: f32) -> MenuAction {
     // Menu buttons
     let bx = sw/2.0 - 130.0;
     let mut action = MenuAction::None;
-    if button("▶  PLAY",         bx, sh*0.52, 260.0, 50.0, GREEN_BTN) { action = MenuAction::Play; }
-    if button("🏆  LEADERBOARD", bx, sh*0.52+62.0, 260.0, 50.0, BLUE_BTN) { action = MenuAction::Leaderboard; }
-    if button("📖  RULES",       bx, sh*0.52+124.0, 260.0, 50.0, PANEL_MID) { action = MenuAction::Rules; }
+    if button("PLAY",         bx, sh*0.52, 260.0, 50.0, GREEN_BTN) { action = MenuAction::Play; }
+    if button("LEADERBOARD", bx, sh*0.52+62.0, 260.0, 50.0, BLUE_BTN) { action = MenuAction::Leaderboard; }
+    if button("RULES",       bx, sh*0.52+124.0, 260.0, 50.0, PANEL_MID) { action = MenuAction::Rules; }
 
     // Version tag
-    draw_text_shadow("v0.1.0  —  LAN Edition", 8.0, sh - 8.0, 12.0, STONE_MID);
+    draw_text_shadow("v0.1.0  -  LAN Edition", 8.0, sh - 8.0, 12.0, STONE_MID);
     action
 }
 

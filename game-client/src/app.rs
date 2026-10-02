@@ -49,8 +49,10 @@ pub struct App {
     // Timing
     t:            f32,
     poll_timer:   f32,
-    // Pending requests
-    pending:      Option<Pending>,
+    // In-flight HTTP requests (several can be outstanding at once)
+    pending:      Vec<Pending>,
+    // Join-by-code: (code, island_type) waiting for the game list to resolve it
+    pending_code: Option<(String, String)>,
 }
 
 impl App {
@@ -69,28 +71,44 @@ impl App {
             game_ui:     GameScreenState::default(),
             t:           0.0,
             poll_timer:  0.0,
-            pending:     None,
+            pending:     Vec::new(),
+            pending_code: None,
         }
     }
 
-    // ── Send a request (one at a time) ──────────────────────────────────────
+    // ── Send a request ──────────────────────────────────────────────────────
     fn send(&mut self, req: network::PendingRequest, kind: &'static str) {
-        self.pending = Some(Pending { req, kind });
+        self.pending.push(Pending { req, kind });
+    }
+
+    fn has_pending(&self, kind: &str) -> bool {
+        self.pending.iter().any(|p| p.kind == kind)
+    }
+
+    fn clear_loading(&mut self) {
+        self.login_state.loading = false;
+        self.lobby_state.loading = false;
     }
 
     // ── Process completed HTTP responses ────────────────────────────────────
     fn poll_pending(&mut self) {
-        let ready = if let Some(p) = &mut self.pending {
-            p.req.try_recv()
-        } else {
-            return;
-        };
-        if let Some(result) = ready {
-            let kind = self.pending.as_ref().unwrap().kind;
-            self.pending = None;
+        let mut done: Vec<(&'static str, Result<serde_json::Value, String>)> = Vec::new();
+        let mut i = 0;
+        while i < self.pending.len() {
+            match self.pending[i].req.try_recv() {
+                Some(result) => {
+                    let p = self.pending.remove(i);
+                    done.push((p.kind, result));
+                }
+                None => i += 1,
+            }
+        }
+        for (kind, result) in done {
             match result {
                 Ok(v)  => self.handle_response(kind, v),
                 Err(e) => {
+                    // Never leave the UI stuck on "Loading..."
+                    self.clear_loading();
                     tracing_set_msg(self, &format!("Network error: {}", e));
                 }
             }
@@ -102,8 +120,8 @@ impl App {
         if !ok {
             let err = v["error"].as_str().unwrap_or("Unknown error").to_string();
             tracing_set_msg(self, &err);
-            self.login_state.loading = false;
-            self.lobby_state.loading = false;
+            self.clear_loading();
+            self.pending_code = None;
             return;
         }
         match kind {
@@ -117,19 +135,27 @@ impl App {
                     self.screen = Screen::Lobby;
                     self.lobby_state = LobbyState::default();
                     self.login_state.loading = false;
+                    self.login_state.error_msg.clear();
+                    self.lobby_state.message.clear();
                 }
+            }
+            "start_game" => {
+                self.game_ui.last_message = "Game started!".into();
+                self.game_ui.message_timer = 2.5;
+                self.request_state();
             }
             "create_game" => {
                 if let Some(id) = v["game"]["id"].as_str() {
                     self.game_id = Some(id.to_string());
                     self.lobby_state.loading = false;
                     self.lobby_state.message = format!("Game created! Code: {}", v["game"]["game_code"].as_str().unwrap_or(""));
+                    self.game_ui = GameScreenState::default();
                     self.request_state();
                 }
             }
             "join_game" => {
                 self.lobby_state.loading = false;
-                self.lobby_state.message = "Joined! Starting soon…".into();
+                self.lobby_state.message = "Joined! Starting soon...".into();
                 self.request_state();
             }
             "list_games" => {
@@ -144,6 +170,24 @@ impl App {
                             current_round: g["current_round"].as_i64()? as i32,
                         })
                     }).collect();
+                }
+                // Resolve a pending "join by code" now that we have the list
+                if let Some((code, island)) = self.pending_code.take() {
+                    let found = self.lobby_state.games.iter()
+                        .find(|g| g.game_code.eq_ignore_ascii_case(&code))
+                        .map(|g| g.id.clone());
+                    match (found, self.token.clone()) {
+                        (Some(id), Some(tok)) => {
+                            self.game_id = Some(id.clone());
+                            let req = network::req_join_game(&tok, &id, &island);
+                            self.send(req, "join_game");
+                            self.lobby_state.message = format!("Joining {}...", code);
+                        }
+                        _ => {
+                            self.lobby_state.loading = false;
+                            self.lobby_state.message = format!("No open game with code {}", code);
+                        }
+                    }
                 }
             }
             "state" => {
@@ -202,7 +246,7 @@ impl App {
         self.poll_pending();
 
         // Auto-poll game state while in game
-        if matches!(self.screen, Screen::InGame) && self.pending.is_none() {
+        if matches!(self.screen, Screen::InGame) && !self.has_pending("state") {
             self.poll_timer += dt;
             if self.poll_timer >= POLL_INTERVAL {
                 self.poll_timer = 0.0;
@@ -255,13 +299,13 @@ impl App {
                         }
                     }
                     LobbyAction::JoinByCode { code, island_type } => {
-                        // Find game by code then join
-                        self.lobby_state.message = format!("Joining {}…", code);
-                        // For simplicity, treat code as game_id placeholder
-                        // In production, add a GET /api/games?code=... endpoint
-                        if let Some(tok) = &self.token {
-                            let req = network::req_join_game(tok, &code, &island_type);
-                            self.send(req, "join_game");
+                        // The join endpoint needs the game's UUID, so first fetch the
+                        // open-games list, look the code up, then join (see "list_games").
+                        self.lobby_state.message = format!("Looking up {}...", code);
+                        if let Some(tok) = self.token.clone() {
+                            self.pending_code = Some((code, island_type));
+                            let req = network::req_list_games(&tok);
+                            self.send(req, "list_games");
                         }
                     }
                     LobbyAction::Refresh => {
@@ -306,6 +350,10 @@ impl App {
                                 self.send(req, "action");
                                 self.poll_timer = 0.0;
                             }
+                            GameAction::StartGame => {
+                                let req = network::req_start_game(tok, gid);
+                                self.send(req, "start_game");
+                            }
                             GameAction::Leave => { self.screen = Screen::Lobby; }
                             GameAction::PollState => { self.request_state(); }
                             GameAction::None => {}
@@ -316,12 +364,15 @@ impl App {
                     let sw = screen_width();
                     let sh = screen_height();
                     clear_background(BG_DARK);
-                    draw_text_centered("Loading game…", sw/2.0, sh/2.0, 28.0, GOLD_TEXT);
-                    if self.pending.is_none() { self.request_state(); }
+                    draw_text_centered("Loading game...", sw/2.0, sh/2.0, 28.0, GOLD_TEXT);
+                    if !self.has_pending("state") { self.request_state(); }
                 }
             }
             Screen::Results => {
-                if let (Some(gs), Some(player)) = (&self.game_state.clone(), &self.player) {
+                if self.game_state.is_none() || self.player.is_none() {
+                    // Nothing to show - never leave a blank screen
+                    self.screen = Screen::Menu;
+                } else if let (Some(gs), Some(player)) = (&self.game_state.clone(), &self.player) {
                     match draw_results(gs, &player.id, self.t) {
                         ResultsAction::MainMenu  => { self.screen = Screen::Menu; }
                         ResultsAction::PlayAgain => {
@@ -346,7 +397,7 @@ impl App {
         clear_background(BG_DARK);
         let pw = (sw * 0.70).min(640.0);
         let px = sw/2.0 - pw/2.0;
-        draw_panel_titled(px, 40.0, pw, sh - 100.0, "  🏆  Leaderboard — Current Season");
+        draw_panel_titled(px, 40.0, pw, sh - 100.0, "  Leaderboard - Current Season");
 
         for (i, entry) in self.leaderboard.iter().enumerate().take(15) {
             let ey = 82.0 + i as f32 * 46.0;
@@ -357,7 +408,7 @@ impl App {
             let score  = entry["score"].as_i64().unwrap_or(0);
             let wins   = entry["wins"].as_i64().unwrap_or(0);
             let played = entry["games_played"].as_i64().unwrap_or(0);
-            let medal  = match rank { 1=>"🥇", 2=>"🥈", 3=>"🥉", _=>"  " };
+            let medal  = match rank { 1=>"1st", 2=>"2nd", 3=>"3rd", _=>"   " };
             draw_text_shadow(&format!("{}  {:>2}.  {:<20}  Score: {:>5}  Wins: {}  Games: {}",
                 medal, rank, uname, score, wins, played),
                 px+14.0, ey+26.0, 15.0, WHITE);

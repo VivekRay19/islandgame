@@ -28,10 +28,10 @@ pub fn draw_results(gs: &GameStateData, my_player_id: &str, t: f32) -> ResultsAc
     }
 
     // Title
-    let title     = if is_winner { "🏆 VICTORY!" } else { "Game Over" };
+    let title     = if is_winner { "VICTORY!" } else { "Game Over" };
     let title_col = if is_winner { GOLD } else { STONE_LIGHT };
     draw_text_centered(title, sw/2.0, sh*0.14, 56.0, title_col);
-    draw_text_centered("Cultural Islands  —  Final Scores", sw/2.0, sh*0.22, 20.0, STONE_MID);
+    draw_text_centered("Cultural Islands  -  Final Scores", sw/2.0, sh*0.22, 20.0, STONE_MID);
 
     // Scores panel
     let mut sorted: Vec<&crate::types::PlayerIsland> = gs.islands.iter().collect();
@@ -59,7 +59,7 @@ pub fn draw_results(gs: &GameStateData, my_player_id: &str, t: f32) -> ResultsAc
         draw_rectangle_lines(px+8.0, iy+2.0, pw-16.0, 64.0, 1.0, PANEL_BORDER);
 
         // Rank medal
-        let medal = match rank { 0 => "🥇", 1 => "🥈", 2 => "🥉", _ => "  " };
+        let medal = match rank { 0 => "1st", 1 => "2nd", 2 => "3rd", _ => "   " };
         draw_text_shadow(medal, px+18.0, iy+28.0, 22.0, GOLD_TEXT);
 
         // Island type tag
@@ -78,7 +78,7 @@ pub fn draw_results(gs: &GameStateData, my_player_id: &str, t: f32) -> ResultsAc
 
         // Score breakdown
         draw_text_shadow(
-            &format!("Tasks: {}  Events: {}  Harmony: {}  →  TOTAL: {}",
+            &format!("Tasks: {}  Events: {}  Harmony: {}  ->  TOTAL: {}",
                 island.task_score, island.event_score,
                 island.cultural_harmony / 10, score),
             px+80.0, iy+48.0, 13.0, STONE_LIGHT);
@@ -100,7 +100,7 @@ pub fn draw_results(gs: &GameStateData, my_player_id: &str, t: f32) -> ResultsAc
     // Buttons
     let btn_y = log_y + 126.0;
     let mut result = ResultsAction::None;
-    if button("🏠  MAIN MENU",  px,             btn_y, pw/2.0-6.0, 48.0, PANEL_MID)  { result = ResultsAction::MainMenu; }
-    if button("▶  PLAY AGAIN",  px+pw/2.0+6.0,  btn_y, pw/2.0-6.0, 48.0, GREEN_BTN) { result = ResultsAction::PlayAgain; }
+    if button("MAIN MENU",  px,             btn_y, pw/2.0-6.0, 48.0, PANEL_MID)  { result = ResultsAction::MainMenu; }
+    if button("PLAY AGAIN",  px+pw/2.0+6.0,  btn_y, pw/2.0-6.0, 48.0, GREEN_BTN) { result = ResultsAction::PlayAgain; }
     result
 }

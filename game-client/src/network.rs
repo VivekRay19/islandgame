@@ -2,7 +2,14 @@
 use quad_net::http_request::{RequestBuilder, Method};
 use serde_json::Value;
 
-pub const API_BASE: &str = "http://192.168.8.10:8067/api";
+// In the browser the page is served by the game server itself, so use a
+// same-origin relative URL. This works from any host/IP/port (LAN, localhost,
+// reverse proxy) and avoids mixed-content / CORS problems.
+#[cfg(target_arch = "wasm32")]
+pub const API_BASE: &str = "/api";
+// Native debug builds talk to a local server.
+#[cfg(not(target_arch = "wasm32"))]
+pub const API_BASE: &str = "http://127.0.0.1:8067/api";
 
 pub struct PendingRequest {
     inner: quad_net::http_request::Request,

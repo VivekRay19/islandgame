@@ -15,12 +15,12 @@ if ! rustup target list --installed | grep -q "$WASM_TARGET"; then
   rustup target add "$WASM_TARGET"
 fi
 
-# 2. Download mq_js_bundle.js if missing
-if [ ! -f "$STATIC_DIR/mq_js_bundle.js" ]; then
-  echo "▶ Downloading Macroquad JS bundle..."
-  curl -fsSL -o "$STATIC_DIR/mq_js_bundle.js" \
-    "https://not-fl3.github.io/miniquad-samples/mq_js_bundle.js"
-fi
+# 2. Verify the vendored Miniquad JS runtime is present (it lives in ../static, committed to git)
+for f in gl.js sapp_jsutils.js audio.js quad-net.js index.html; do
+  if [ ! -f "$STATIC_DIR/$f" ]; then
+    echo "✗ Missing $STATIC_DIR/$f"; exit 1
+  fi
+done
 
 # 3. Build WASM
 echo "▶ Building WASM (release)..."
@@ -33,7 +33,7 @@ cp "target/$WASM_TARGET/release/$BIN.wasm" "$STATIC_DIR/"
 echo ""
 echo "✔ Build complete!"
 echo "  WASM → $STATIC_DIR/$BIN.wasm"
-echo "  JS   → $STATIC_DIR/mq_js_bundle.js"
+echo "  JS   → $STATIC_DIR/gl.js (+ plugins)"
 echo ""
 echo "  Now build the server and run:"
 echo "    cd ../game-server && cargo build --release"

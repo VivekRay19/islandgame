@@ -3,15 +3,41 @@ use macroquad::prelude::*;
 use crate::ui::colors::*;
 use std::f32::consts::PI;
 
+// ── Text helpers ─────────────────────────────────────────────────────────────
+/// Macroquad's built-in font only contains printable ASCII. Emoji and fancy
+/// punctuation render as blank boxes (or nothing), so map the common ones to
+/// ASCII look-alikes and drop everything else. Also used on server-provided
+/// strings (trader avatars, action log) that may contain emoji.
+pub fn ascii_safe(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            ' '..='~' => out.push(c),
+            '\u{2014}' | '\u{2013}' => out.push('-'),
+            '\u{2192}' | '\u{27F6}' | '\u{25B6}' => out.push('>'),
+            '\u{2026}' => out.push_str("..."),
+            '\u{2022}' | '\u{00B7}' => out.push('*'),
+            '\u{00B0}' => out.push_str(" deg"),
+            '\u{2705}' | '\u{2713}' => out.push('+'),
+            '\u{26A0}' => out.push('!'),
+            '\n' | '\t' => out.push(' '),
+            _ => {} // emoji, variation selectors, zero-width joiners, ...
+        }
+    }
+    out
+}
+
 // ── Shadow text ──────────────────────────────────────────────────────────────
 pub fn draw_text_shadow(text: &str, x: f32, y: f32, size: f32, color: Color) {
-    draw_text(text, x + 2.0, y + 2.0, size, SHADOW);
-    draw_text(text, x, y, size, color);
+    let text = ascii_safe(text);
+    draw_text(&text, x + 2.0, y + 2.0, size, SHADOW);
+    draw_text(&text, x, y, size, color);
 }
 
 pub fn draw_text_centered(text: &str, cx: f32, cy: f32, size: f32, color: Color) {
-    let dim = measure_text(text, None, size as u16, 1.0);
-    draw_text_shadow(text, cx - dim.width / 2.0, cy + dim.height / 2.0, size, color);
+    let text = ascii_safe(text);
+    let dim = measure_text(&text, None, size as u16, 1.0);
+    draw_text_shadow(&text, cx - dim.width / 2.0, cy + dim.height / 2.0, size, color);
 }
 
 // ── CoC-style beveled panel ──────────────────────────────────────────────────
@@ -138,7 +164,7 @@ pub fn draw_hex_tile(cx: f32, cy: f32, radius: f32, top_color: Color,
 
     // ── Damaged overlay ───────────────────────────────────────────────────
     if damaged {
-        draw_text_centered("💥", cx, cy - radius*0.1, (radius*0.45).min(20.0), RED_BTN);
+        draw_text_centered("!", cx, cy - radius*0.30, (radius*0.55).min(26.0), RED_BTN);
     }
 }
 
