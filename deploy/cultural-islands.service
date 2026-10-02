@@ -5,14 +5,14 @@ Requires=postgresql.service
 
 [Service]
 Type=simple
-User=ubuntu
-Group=ubuntu
+User=jofrey
+Group=jofrey
 WorkingDirectory=/opt/islandgame
 
 # Load env vars
 EnvironmentFile=/opt/islandgame/.env
 
-# Run the compiled binary
+# Run the compiled binary (workspace target directory)
 ExecStart=/opt/islandgame/target/release/cultural-islands-server
 
 Restart=on-failure
