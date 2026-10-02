@@ -1,219 +1,156 @@
-# Cultural Islands — Full Stack Setup & Deployment Guide
-
-## Server: `0.0.0.0` (Default Port: `8067` | WebSocket: `8068`)
+# Cultural Islands — Setup & Deploy Guide
+**Server: 192.168.8.10 | HTTP: 8067 | WS: 8068**
 
 ---
 
-## Quick Start with Makefile
+## Quick start (server already running)
 
-If you have `make` installed, you can manage the entire application with simple commands:
-
+If the service is already installed and the DB is set up, just run:
 ```bash
-# 1. Setup environment configuration
-cp .env.example .env
-
-# 2. Setup PostgreSQL database (creates DB, runs schema migrations, and seeds data)
-make db-setup
-
-# 3. Build both WASM game client and server binary
-make build
-
-# 4. (Optional) Install systemd service for auto-start
-make install
-
-# 5. Start / Restart the service
-make start       # or 'make restart' to rebuild + restart
-make status      # check service status
-make logs        # follow live logs
-make health      # verify HTTP health endpoint
+make deploy-client        # push JS changes live instantly
+make restart              # restart server if needed
+make logs                 # tail live logs
 ```
 
 ---
 
-## 1. Prerequisites
+## First-time setup
 
+### 1. Prerequisites
 ```bash
-# Rust toolchain (if not already installed)
+# Rust toolchain
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source $HOME/.cargo/env
-
-# WASM target for the game client
-rustup target add wasm32-unknown-unknown
-
-# PostgreSQL client / server
-# Verify PostgreSQL is active:
-sudo systemctl status postgresql --no-pager
 ```
 
----
-
-## 2. Database Setup
-
-You can use `make db-setup` or run the commands manually:
-
+### 2. Database
 ```bash
-# Create the database using postgres user (or your current PostgreSQL user)
-sudo -u postgres psql -c "CREATE DATABASE cultural_islands;"
-
-# If running as your local OS user, grant access or create a dedicated user:
-# sudo -u postgres createuser -s $USER 2>/dev/null || true
-
-# Run schema migrations
-sudo -u postgres psql -d cultural_islands -f database/001_schema.sql
-
-# Seed initial story events, regions, and first season
-sudo -u postgres psql -d cultural_islands -f database/002_seed.sql
+make db-setup
+# Creates: cultural_islands DB, all tables, seeds season 1 + story events
 ```
 
----
-
-## 3. Environment Configuration
-
+### 3. Download Phaser 3 (one time, needs internet)
 ```bash
-cp .env.example .env
+make download-phaser
+# Saves phaser.min.js to static/ — no internet needed after this
 ```
 
-Edit `.env` to suit your deployment:
-
-```ini
-# Database connection string
-DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/cultural_islands
-DB_POOL_SIZE=15
-
-# Server binding
-HTTP_PORT=8067
-WS_PORT=8068
-HOST=0.0.0.0
-STATIC_DIR=./static
-
-# Auth
-JWT_SECRET=replace_with_a_secure_random_string
-JWT_EXPIRES_HOURS=72
-
-# Game Configuration
-MAX_PLAYERS_PER_GAME=4
-MAX_ROUNDS=6
-RUST_LOG=info
-```
-
----
-
-## 4. Build the Game
-
-You can build everything with a single command:
-
-```bash
-make build
-```
-
-Or build the components individually:
-
-### Client (WASM)
-```bash
-make build-client
-# Or manually:
-# cd game-client && ./build.sh
-```
-This builds `cultural_islands_client.wasm` and downloads `mq_js_bundle.js` into the `static/` directory.
-
-### Server (Rust release binary)
+### 4. Build the Rust server
 ```bash
 make build-server
-# Or manually:
-# cd game-server && cargo build --release
 ```
-The compiled binary will be placed at `target/release/cultural-islands-server`.
 
----
-
-## 5. Running the Application
-
-### Option A: Systemd Service (Recommended for Production)
-
+### 5. Full deploy (copies files + starts service)
 ```bash
-# Configures the service with your current user and repo directory automatically
-make install
-
-# Start and monitor
-make start
-make status
-make logs
+make deploy
 ```
 
-### Option B: Run Directly from Shell
+### 6. Open the game
+Any browser on the LAN: **http://192.168.8.10:8067**
 
+---
+
+## Directory structure
+
+```
+IslandGame/
+├── game-server/          Rust API server (Actix-web)
+│   └── src/
+│       ├── handlers/     auth, game, leaderboard, campaign
+│       ├── game_logic/   hex grid, tiles, events, trade, scoring
+│       ├── models/       DB structs
+│       └── ws/           WebSocket handler (port 8068)
+├── static/               JS game client (edit these files)
+│   ├── index.html        loading splash + Phaser boot
+│   ├── phaser.min.js     local Phaser 3 (downloaded once)
+│   └── js/
+│       ├── main.js       Phaser config + scene list
+│       ├── config.js     tile defs, resource colours, API URL
+│       ├── api.js        all HTTP calls to Rust server
+│       ├── scenes/       one file per game screen
+│       │   ├── BootScene.js
+│       │   ├── MenuScene.js
+│       │   ├── LoginScene.js
+│       │   ├── LobbyScene.js
+│       │   ├── GameScene.js
+│       │   ├── ResultsScene.js
+│       │   └── LeaderboardScene.js
+│       ├── game/         board rendering + HUD components
+│       │   ├── HexBoard.js
+│       │   ├── HUD.js
+│       │   ├── EventPanel.js
+│       │   └── TilePicker.js
+│       └── ui/           reusable CoC-style UI primitives
+│           ├── Colors.js
+│           ├── Button.js
+│           ├── Panel.js
+│           └── TextInput.js
+├── database/
+│   ├── 001_schema.sql    all 18 tables
+│   └── 002_seed.sql      season 1 + story events
+└── deploy/
+    └── cultural-islands.service   systemd unit
+```
+
+---
+
+## Editing the JS client
+
+No build step — edit, save, refresh:
+
+| File | What to change |
+|------|----------------|
+| `static/js/config.js` | API URL, tile definitions, resource colours |
+| `static/js/api.js` | Add or change API calls |
+| `static/js/scenes/GameScene.js` | Main game screen layout & interactions |
+| `static/js/game/HexBoard.js` | Hex tile rendering & grid logic |
+| `static/js/ui/Colors.js` | Colour palette |
+
+After editing, push to server:
 ```bash
-./target/release/cultural-islands-server
+make deploy-client
 ```
 
 ---
 
-## 6. Accessing the Game
-
-Open any browser on your network and navigate to:
-
-```text
-http://<server-ip>:8067
-```
-
-Example (LAN): `http://192.168.8.10:8067` or `http://localhost:8067`
-
-Players can join directly from any desktop or mobile browser on the same network.
-
----
-
-## Makefile Reference
-
-| Command | Description |
-|---|---|
-| `make build` | Builds WASM client and server binary |
-| `make build-client` | Compiles WASM client and prepares `static/` bundle |
-| `make build-server` | Builds server release binary |
-| `make db-setup` | Creates DB, applies migrations, and seeds data |
-| `make db-migrate` | Applies `database/001_schema.sql` |
-| `make db-seed` | Seeds `database/002_seed.sql` |
-| `make install` | Installs & enables systemd unit for current user/path |
-| `make start` | Starts systemd service |
-| `make stop` | Stops systemd service |
-| `make restart` | Rebuilds and restarts service with status check |
-| `make status` | Checks service status (`--no-pager`) |
-| `make logs` | Follows live journalctl logs |
-| `make health` | Checks HTTP health endpoint |
-| `make clean` | Cleans build artifacts |
-
----
-
-## API Reference
+## API reference
 
 | Method | Endpoint | Description |
-|---|---|---|
-| GET  | `/health` | Service health status |
-| POST | `/api/auth/register` | Create account |
-| POST | `/api/auth/login` | Login |
-| GET  | `/api/auth/me` | Current player |
-| GET  | `/api/games` | List open games |
-| POST | `/api/games` | Create game |
-| POST | `/api/games/:id/join` | Join game |
-| POST | `/api/games/:id/start` | Start game (host) |
-| GET  | `/api/games/:id/state` | Full game state |
-| POST | `/api/games/:id/place-tile` | Place a hex tile |
-| POST | `/api/games/:id/respond-event` | Handle event |
-| POST | `/api/games/:id/trade` | Haat trade |
-| POST | `/api/games/:id/complete-task` | Build task |
-| POST | `/api/games/:id/end-turn` | End your turn |
-| GET  | `/api/leaderboard` | Season rankings |
-| GET  | `/api/campaign` | Campaign progress |
-| WS   | `/ws?game_id=UUID` | WebSocket live events |
+|--------|----------|-------------|
+| POST | /api/auth/register | Create account |
+| POST | /api/auth/login | Login |
+| GET  | /api/auth/me | Current player info |
+| GET  | /api/games | List open games |
+| POST | /api/games | Create game |
+| POST | /api/games/:id/join | Join a game |
+| POST | /api/games/:id/start | Start (host only) |
+| GET  | /api/games/:id/state | Full game state |
+| POST | /api/games/:id/place-tile | Place a hex tile |
+| POST | /api/games/:id/respond-event | Handle event |
+| POST | /api/games/:id/trade | Haat trade |
+| POST | /api/games/:id/complete-task | Complete development task |
+| POST | /api/games/:id/end-turn | End your turn |
+| GET  | /api/leaderboard | Season rankings |
+| GET  | /api/campaign | Campaign progress |
+| WS   | ws://192.168.8.10:8068/ws?game_id=UUID | Live game events |
 
 ---
 
-## Game Rules Summary
+## Browser compatibility
 
-- **6 Rounds**, 3 Levels (2 rounds each)
-- **Turn order**: Respond to event → Build tile → Haat trade → Complete task → End turn
-- **Tile placement**: Must be adjacent to existing tiles (hex grid)
-- **Edge matching**: Matching tile edges gives +15 pts each (+25 if all match)
-- **Resources**: 8 types — grain, fibre, wood, stone, clay, water, music, ore
-- **Traders**: 5 island traders at the Haat Market (max 2 trades/round)
-- **Events**: Fire (use 2 water), Drought (use 2 water), Festival (free), Harvest (free), Storm
-- **Win**: Highest total of Task Score + Event Score + Cultural Harmony / 10
+Phaser 3 uses **WebGL with automatic Canvas 2D fallback**.
+Works on: Chrome 80+, Firefox 78+, Safari 14+, Edge 80+, any Android/iOS browser.
+No TypeScript, no npm, no build step.
+
+---
+
+## Game rules summary
+
+- **6 Rounds**, 3 Levels (L1: rounds 1-2, L2: 3-4, L3: 5-6)
+- **Turn order**: Respond to event → Build tile → Haat Trade → Complete Task → End Turn
+- **Tile placement**: Must connect to your island (hex adjacency)
+- **Edge matching**: +15 pts per matched edge, +25 bonus if all neighbours match
+- **8 Resources**: grain, fibre, wood, stone, clay, water, music, ore
+- **5 Traders** at the Haat Market (max 2 trades per round)
+- **Events**: Fire & Drought (cost 2 water), Festival & Harvest (free), Storm
+- **Win**: highest total of Task Score + Event Score + Cultural Harmony ÷ 10

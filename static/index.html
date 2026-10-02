@@ -2,117 +2,159 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Cultural Islands</title>
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      margin: 0; padding: 0;
       width: 100%; height: 100%;
+      background: #0e1f09;
       overflow: hidden;
-      background: #12200c;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: #f0f6fc;
+      font-family: 'Segoe UI', system-ui, sans-serif;
     }
-    /* gl.js sizes the drawing buffer from the canvas' CSS size, so it must fill the window */
-    #glcanvas {
-      position: absolute; top: 0; left: 0;
-      width: 100%; height: 100%;
-      display: block;
-      touch-action: none;
-      outline: none;
+
+    /* ── Splash screen ─────────────────────────────────────── */
+    #splash {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: linear-gradient(160deg, #0e1f09 0%, #1b3a10 55%, #0e1f09 100%);
+      transition: opacity 0.65s ease;
     }
-    #status-overlay {
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      background: rgba(22, 27, 34, 0.92);
-      padding: 28px 36px;
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      max-width: 85%;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-      transition: opacity 0.4s ease, visibility 0.4s ease;
-      z-index: 9999;
+    #splash.hidden { opacity: 0; pointer-events: none; }
+    #splash.gone   { display: none; }
+
+    .logo {
+      font-size: 2.8rem; font-weight: 900; letter-spacing: 3px;
+      color: #ffc800;
+      text-shadow: 0 0 28px #ffc80066, 2px 3px 0 #3d2200;
+      margin-bottom: 6px;
     }
-    .hidden { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
-    .spinner {
-      border: 3px solid rgba(255, 255, 255, 0.15);
-      border-top: 3px solid #58a6ff;
-      border-radius: 50%;
-      width: 36px; height: 36px;
-      animation: spin 0.9s linear infinite;
-      margin: 0 auto 16px auto;
+    .sub {
+      color: #c7bfab; font-size: 0.95rem; letter-spacing: 1px;
+      margin-bottom: 36px;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Animated hex row */
+    .hexrow { display: flex; gap: 10px; margin-bottom: 32px; }
+    .hex {
+      width: 46px; height: 52px;
+      clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+      animation: hexbounce 1.5s ease-in-out infinite;
+    }
+    .hex:nth-child(1){ background:#3a7a20; animation-delay:0s   }
+    .hex:nth-child(2){ background:#1c5e21; animation-delay:.18s }
+    .hex:nth-child(3){ background:#1a75b5; animation-delay:.36s }
+    .hex:nth-child(4){ background:#8a2bb0; animation-delay:.54s }
+    .hex:nth-child(5){ background:#d98c2e; animation-delay:.72s }
+    @keyframes hexbounce {
+      0%,100% { transform: translateY(0)    scale(1.0);  opacity:.80 }
+      50%      { transform: translateY(-9px) scale(1.07); opacity:1.0 }
+    }
+
+    /* Loading bar */
+    .barwrap {
+      width: 280px; height: 10px;
+      background: #1a1008;
+      border: 1.5px solid #8c591a;
+      border-radius: 5px; overflow: hidden;
+    }
+    .bar {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #ffc800, #ff8f00);
+      border-radius: 5px;
+      animation: loadbar 2.4s ease-in-out forwards;
+    }
+    @keyframes loadbar { to { width: 100%; } }
+    .status {
+      color: #ffc800; font-size: 0.78rem;
+      margin-top: 10px; letter-spacing: 1px;
+    }
+
+    /* Error box (shown on Phaser/JS crash) */
+    #errbox {
+      display: none; margin-top: 18px;
+      padding: 10px 18px; max-width: 400px;
+      background: #3a0808; border: 1px solid #8b0000;
+      border-radius: 6px; color: #ff9999;
+      font-size: 0.82rem; text-align: center;
+    }
+
+    /* Phaser canvas */
+    #game-container canvas {
+      display: block !important;
+    }
+    #game-container {
+      width: 100vw; height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
   </style>
 </head>
 <body>
-  <canvas id="glcanvas" tabindex="1"></canvas>
 
-  <div id="status-overlay">
-    <div id="spinner" class="spinner"></div>
-    <div id="status-title" style="font-weight:600;font-size:1.1rem;">Loading Cultural Islands...</div>
-    <div id="status-desc" style="font-size:.88rem;color:#8b949e;margin-top:8px;">Starting engine...</div>
+  <!-- Splash shown while Phaser boots -->
+  <div id="splash">
+    <div class="logo">CULTURAL ISLANDS</div>
+    <div class="sub">Island Development &amp; Survival</div>
+    <div class="hexrow">
+      <div class="hex"></div><div class="hex"></div><div class="hex"></div>
+      <div class="hex"></div><div class="hex"></div>
+    </div>
+    <div class="barwrap"><div class="bar"></div></div>
+    <div class="status" id="splash-status">Loading Phaser engine…</div>
+    <div id="errbox"></div>
   </div>
 
-  <!-- Miniquad runtime. ORDER MATTERS: gl.js first, then plugins, then load().
-       gl.js looks up #glcanvas immediately, so these must come after the <canvas>. -->
-  <script src="gl.js?v=3"></script>
-  <script src="sapp_jsutils.js?v=3"></script>
-  <script src="audio.js?v=3"></script>
-  <script src="quad-net.js?v=3"></script>
+  <!-- Phaser mounts its canvas here -->
+  <div id="game-container"></div>
+
+  <!-- Phaser 3 (served locally — no CDN needed on LAN) -->
+  <script src="phaser.min.js"></script>
+
+  <!-- Game modules loaded as ES modules -->
+  <script type="module" src="js/main.js"></script>
 
   <script>
-    (function () {
-      'use strict';
-      var WASM = 'cultural_islands_client.wasm?v=3';
+    const splash = document.getElementById('splash');
+    const status = document.getElementById('splash-status');
+    const errbox = document.getElementById('errbox');
 
-      function $(id) { return document.getElementById(id); }
-      function fail(title, desc) {
-        var sp = $('spinner'); if (sp) sp.style.display = 'none';
-        $('status-title').innerText = title;
-        $('status-title').style.color = '#f85149';
-        $('status-desc').innerText = desc;
-        $('status-overlay').classList.remove('hidden');
-      }
+    function hideSplash() {
+      splash.classList.add('hidden');
+      setTimeout(() => splash.classList.add('gone'), 700);
+    }
 
-      // Hide the overlay the moment the WASM module has been instantiated
-      // (gl.js calls every plugin's on_init() right before main()).
-      miniquad_add_plugin({
-        register_plugin: function () {},
-        on_init: function () { $('status-overlay').classList.add('hidden'); },
-        name: 'loading_overlay',
-        version: 1
-      });
+    function showError(msg) {
+      errbox.style.display = 'block';
+      errbox.textContent   = '⚠ ' + String(msg).slice(0, 300);
+      status.textContent   = 'Failed to start — check console (F12)';
+    }
 
-      // Surface JS / WASM runtime errors on screen instead of a silent blank page.
-      window.addEventListener('error', function (e) {
-        if (e && e.message) { fail('Runtime error', e.message); }
-      });
-      var origErr = console.error;
-      console.error = function () {
-        origErr.apply(console, arguments);
-        var m = Array.prototype.join.call(arguments, ' ');
-        if (m.indexOf('WASM failed to load') !== -1) {
-          fail('Could not start the game', 'See the browser console (F12) for details. Is cultural_islands_client.wasm in static/?');
-        }
-      };
+    // Surface JS / module errors in the splash
+    window.addEventListener('error', e => showError(e.message));
+    window.addEventListener('unhandledrejection', e => showError(e.reason));
 
-      // Pre-flight: make sure the wasm file exists and is really wasm before handing it to gl.js.
-      fetch(WASM, { cache: 'no-cache' }).then(function (res) {
-        if (!res.ok) { throw new Error('HTTP ' + res.status + ' for ' + WASM + ' - run "make build-client" and restart the service.'); }
-        return res.arrayBuffer();
-      }).then(function (buf) {
-        var magic = new Uint8Array(buf, 0, 4);
-        if (magic[0] !== 0 || magic[1] !== 0x61 || magic[2] !== 0x73 || magic[3] !== 0x6d) {
-          throw new Error(WASM + ' is not a WebAssembly binary.');
-        }
-        $('status-desc').innerText = 'Starting game...';
-        load(WASM);
-      }).catch(function (err) {
-        fail('Could not load the game', err.message || String(err));
-      });
-    })();
+    // Intercept console.error to catch Phaser internal failures
+    const _origErr = console.error.bind(console);
+    console.error = function(...a) {
+      _origErr(...a);
+      const m = a.join(' ');
+      if (/phaser|webgl|failed/i.test(m)) showError(m.slice(0, 200));
+    };
+
+    // Phaser dispatches this event when the first scene is ready
+    window.addEventListener('phaser-boot', hideSplash, { once: true });
+
+    // Fallback: hide splash 4 s after page load regardless
+    window.addEventListener('load', () => {
+      status.textContent = 'Starting game…';
+      setTimeout(() => {
+        if (!splash.classList.contains('hidden')) hideSplash();
+      }, 4000);
+    });
+
+    // Prevent right-click context menu on game canvas
+    document.addEventListener('contextmenu', e => e.preventDefault());
   </script>
 </body>
 </html>
