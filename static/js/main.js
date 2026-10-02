@@ -9,12 +9,14 @@ import { LeaderboardScene } from './scenes/LeaderboardScene.js';
 
 const config = {
   type:   Phaser.AUTO,           // WebGL if available, Canvas 2D fallback
+  parent: 'game-container',      // mount inside #game-container div
   width:  1280,
   height: 720,
   backgroundColor: '#0e1f09',
   scale: {
     mode:           Phaser.Scale.FIT,
     autoCenter:     Phaser.Scale.CENTER_BOTH,
+    parent:         'game-container',
     width:          1280,
     height:         720,
   },

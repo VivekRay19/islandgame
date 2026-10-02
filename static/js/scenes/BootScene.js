@@ -13,10 +13,19 @@ export class BootScene extends Phaser.Scene {
     }).setOrigin(0.5, 0.5);
   }
 
-  async create() {
+  create() {
     // Tell the HTML splash screen Phaser is alive
     window.dispatchEvent(new Event('phaser-boot'));
 
+    // Use .then/.catch so Phaser doesn't silently swallow async errors
+    this._boot().catch(err => {
+      console.error('BootScene error:', err);
+      // Still transition even on error
+      this.scene.start('MenuScene');
+    });
+  }
+
+  async _boot() {
     if (auth.isLoggedIn()) {
       try {
         await api.me();           // verify token still valid
