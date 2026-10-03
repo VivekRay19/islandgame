@@ -119,3 +119,8 @@
   .omen-strip{top:auto;bottom:196px}.build-wheel{max-width:98vw;overflow:auto}
   .tip{display:none}
 }
+
+/* Flat in-game background (BOARD_BG 3/3: keep in sync with BOARD_BG in js/board.js) */
+.game-scene{background:#10241e}
+.game-shade{display:none}
+

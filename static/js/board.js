@@ -1,12 +1,12 @@
 // @ts-check
 // PixiJS board: draws whatever the Rust engine says exists. It owns pixels,
 // camera and juice (fire, embers, steam, floating numbers) and never rules.
-import { Application, Assets, Container, Graphics, Sprite, Text, TextStyle } from '/vendor/pixi.min.mjs';
+import { Application, Container, Graphics, Text, TextStyle } from '/vendor/pixi.min.mjs';
 import { animate } from '/vendor/anime.esm.min.js';
 
 export const TILE_SIZE = 78;
 const SQRT3 = Math.sqrt(3);
-const WORLD_ART = '/assets/island_world.webp';
+export const BOARD_BG = 0x10241e;   // BOARD_BG (1/3): keep in sync with #10241e in v2.css
 const TERRAIN = {
   meadow: { fill: 0x8fb35f, glyph: '' },
   woods:  { fill: 0x3f7d4b, glyph: '🌲' },
@@ -30,7 +30,7 @@ export class IslandBoard {
   /** @param {HTMLElement} host @param {{onTap:(c:any)=>void, onHover:(c:any, e:any)=>void}} hooks */
   constructor(host, hooks) {
     this.host = host; this.hooks = hooks;
-    this.world = new Container(); this.bgLayer = new Container();
+    this.world = new Container();
     this.hexLayer = new Container(); this.tileLayer = new Container(); this.markLayer = new Container();
     this.fxLayer = new Container(); this.hitLayer = new Container(); this.textLayer = new Container();
     this.zoom = 0.95; this.dragging = false; this.pointerStart = null; this.dragStart = null;
@@ -40,12 +40,10 @@ export class IslandBoard {
 
   async init() {
     this.app = new Application();
-    await this.app.init({ resizeTo: this.host, antialias: true, backgroundColor: 0x0b1c16, preference: 'webgl', powerPreference: 'high-performance' });
+    await this.app.init({ resizeTo: this.host, antialias: true, backgroundColor: BOARD_BG, preference: 'webgl', powerPreference: 'high-performance' });
     this.host.appendChild(this.app.canvas);
-    this.app.stage.addChild(this.bgLayer, this.world);
+    this.app.stage.addChild(this.world);
     this.world.addChild(this.hexLayer, this.tileLayer, this.markLayer, this.fxLayer, this.hitLayer, this.textLayer);
-    const texture = await Assets.load(WORLD_ART);
-    this.art = new Sprite(texture); this.art.anchor.set(0.5); this.bgLayer.addChild(this.art);
     const st = this.app.stage; st.eventMode = 'static'; st.hitArea = this.app.screen;
     st.on('pointerdown', (e) => { this.dragging = false; this.pointerStart = e.global.clone(); this.dragStart = { x: this.world.x, y: this.world.y }; });
     st.on('pointermove', (e) => {
@@ -65,10 +63,8 @@ export class IslandBoard {
   setZoom(z) { this.zoom = Math.min(1.45, Math.max(0.6, z)); this.layout(); }
   resetView() { this.zoom = 0.95; this.world.position.set(this.host.clientWidth / 2, this.host.clientHeight / 2 + 30); this.layout(); }
   layout() {
-    if (!this.app || !this.art) return;
+    if (!this.app) return;
     const w = this.host.clientWidth, h = this.host.clientHeight;
-    const cover = Math.max(w / this.art.texture.width, h / this.art.texture.height) * 1.05;
-    this.art.scale.set(cover); this.bgLayer.position.set(w / 2, h / 2 + 15);
     if (!this.dragging && this.world.x === 0 && this.world.y === 0) this.world.position.set(w / 2, h / 2 + 30);
     this.world.scale.set(this.zoom);
   }
@@ -88,11 +84,11 @@ export class IslandBoard {
     for (const c of v.cells) {
       const p = this.cell(c.q, c.r); const t = TERRAIN[c.terrain] || TERRAIN.meadow;
       const g = new Graphics();
-      g.poly(this.poly(TILE_SIZE - 2)).fill({ color: t.fill, alpha: c.tile ? 0.5 : 0.34 })
-        .stroke({ color: 0xf0e4b8, width: 1.2, alpha: 0.2 });
+      g.poly(this.poly(TILE_SIZE - 2)).fill({ color: t.fill, alpha: c.tile ? 1 : 0.8 })
+        .stroke({ color: 0xf0e4b8, width: 1.4, alpha: 0.35 });
       g.position.set(p.x, p.y); this.hexLayer.addChild(g);
       if (!c.tile && t.glyph) {
-        const m = new Text({ text: t.glyph, style: new TextStyle({ fontSize: 17 }) }); m.anchor.set(0.5); m.alpha = c.cleared ? 0.18 : 0.38; m.position.set(p.x, p.y + 4); this.hexLayer.addChild(m);
+        const m = new Text({ text: t.glyph, style: new TextStyle({ fontSize: 17 }) }); m.anchor.set(0.5); m.alpha = c.cleared ? 0.3 : 0.6; m.position.set(p.x, p.y + 4); this.hexLayer.addChild(m);
       }
       if (c.ruin) this.drawRuin(p);
       if (c.tile) this.drawTile(c, p);
@@ -139,8 +135,8 @@ export class IslandBoard {
 
   drawTile(c, p) {
     const t = c.tile; const group = new Container(); group.position.set(p.x, p.y - 10);
-    group.addChild(new Graphics().ellipse(0, 20, 58, 19).fill({ color: 0x0b140f, alpha: 0.42 }));
-    group.addChild(new Graphics().poly(this.poly(TILE_SIZE - 7)).fill({ color: 0x6d6a4a, alpha: 0.56 }).stroke({ color: 0xe5d6a6, width: 1.5, alpha: 0.22 }));
+    group.addChild(new Graphics().ellipse(0, 20, 58, 19).fill({ color: 0x050d0a, alpha: 0.5 }));
+    group.addChild(new Graphics().poly(this.poly(TILE_SIZE - 7)).fill({ color: 0x6d6a4a, alpha: 1 }).stroke({ color: 0xe5d6a6, width: 1.5, alpha: 0.4 }));
     const art = new Container(); group.addChild(art);
     this.drawBuilding(art, KIND[t.kind] || 'hall', GLYPH[t.kind] || '•');
     if (t.hp < 2) { art.alpha = 0.55; art.tint = 0x998877; this.drawCracks(group); }
@@ -274,7 +270,6 @@ export class IslandBoard {
 
   tick(t) {
     const time = t.lastTime / 1000;
-    if (this.art) this.art.x = Math.sin(time * 0.12) * 0.9;
     for (const p of this.pulses) { if (p.g.destroyed) continue; p.g.alpha = p.ring ? 0.55 + Math.sin(time * 3 + p.ph) * 0.3 : 0.6 + Math.sin(time * 3 + p.ph) * 0.3; }
     if (this.burning.length) for (const b of this.burning) {
       if (Math.random() < 0.55) {
