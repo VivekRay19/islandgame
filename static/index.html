@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#102a24">
   <title>Cultural Islands — Island Development & Survival</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/v2.css">
 </head>
 <body>
   <div id="app-shell">
@@ -57,28 +58,29 @@
           <p>Each island brings a different advantage and a different danger into the season.</p>
         </div>
         <div class="island-choice-wheel" id="island-options"></div>
+        <div class="heat-row" id="heat-row"></div>
         <div class="table-choices">
           <div class="floating-scroll">
-            <div class="scroll-title"><span>OPEN TABLES</span><button id="refresh-games" class="small-compass">↻</button></div>
-            <div id="games-list" class="games-list"></div>
-            <div id="games-empty" class="scroll-empty">No tables are waiting.<br><b>Lay the first foundation.</b></div>
+            <div class="scroll-title"><span>THE SEASON</span><span id="level-chip" class="level-chip">LV 1</span></div>
+            <div class="xp-line"><i id="xp-fill"></i></div>
+            <p id="season-blurb" class="scroll-note">Twelve rounds. Four seasons. Meet the charter and the island thrives.</p>
+            <button id="start-season" class="game-button primary">BEGIN SEASON <b>↗</b></button>
+            <button id="resume-season" class="game-button ghost hidden">RESUME SEASON ↺</button>
           </div>
-          <div class="floating-scroll season-scroll">
-            <div class="scroll-title"><span>SEASON BOARD</span></div>
+          <div class="floating-scroll daily-scroll">
+            <div class="scroll-title"><span>DAILY ISLAND</span><span id="streak-chip" class="level-chip">🔥 0</span></div>
+            <p id="daily-blurb" class="scroll-note">Everyone in the world plays the same island today.</p>
+            <button id="start-daily" class="game-button primary">PLAY TODAY'S ISLAND <b>↗</b></button>
             <div id="leaderboard-mini" class="leaderboard-mini"></div>
-            <div class="create-row"><label>SEATS<select id="max-players"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option></select></label><button id="create-game" class="game-button primary">CREATE TABLE +</button></div>
+          </div>
+          <div class="floating-scroll">
+            <div class="scroll-title"><span>SHARED TABLE</span></div>
+            <p class="scroll-note">Same code, same island, same weather. Share it with a friend and compare.</p>
+            <div class="create-row"><label>TABLE CODE<input id="table-code" maxlength="24" placeholder="e.g. MONSOON-7"></label><button id="start-code" class="game-button primary">PLAY</button></div>
           </div>
         </div>
       </main>
-      <div id="join-modal" class="modal-backdrop hidden">
-        <div class="wood-panel join-scroll">
-          <button id="join-close" class="close-button">×</button>
-          <div class="scroll-title"><span>JOIN THIS TABLE</span></div>
-          <div id="join-islands" class="join-islands"></div>
-          <button id="join-confirm" class="game-button primary">JOIN TABLE ↗</button>
-        </div>
-      </div>
-    </section>
+      </section>
 
     <section id="game-view" class="view game-scene">
       <div id="pixi-root" class="pixi-root"></div>
@@ -86,21 +88,26 @@
 
       <header class="hud-top">
         <div class="hud-cluster left">
-          <button id="back-lobby" class="hud-round" title="Return to table">↩</button>
-          <div class="island-seal"><div class="seal-art">◈</div><div><span id="island-title">Forest Island</span><small>TABLE <b id="game-code">----</b></small></div></div>
+          <button id="back-lobby" class="hud-round" title="Leave (your season is saved)">↩</button>
+          <div class="island-seal"><div class="seal-art">◈</div><div><span id="island-title">Forest Island</span><small id="mode-label">SEASON</small></div></div>
         </div>
-        <div class="round-medallion"><span>ROUND</span><strong id="round-label">1</strong><small id="turn-label">YOUR TURN</small></div>
+        <div class="round-medallion"><span id="season-label">SOWING</span><strong id="round-label">1</strong><small id="turn-label">OF 12</small></div>
         <div class="hud-cluster right" id="resource-strip"></div>
       </header>
 
-      <aside class="quest-ribbon" id="quest-ribbon">
-        <div class="ribbon-pin">◆</div>
-        <div class="quest-caption">CURRENT CHARTER</div>
-        <strong id="quest-title">Build your island.</strong>
-        <span id="quest-subtitle">Complete development goals and survive the season.</span>
-      </aside>
+      <div class="left-stack">
+        <aside class="quest-ribbon" id="quest-ribbon">
+          <div class="ribbon-pin">◆</div>
+          <div class="quest-caption">THE CHARTER · <span id="score-now">0</span> PTS</div>
+          <ul id="goal-list" class="goal-list"></ul>
+        </aside>
+        <div class="meters wood-card" id="meters"></div>
+      </div>
 
+      <div id="omen-strip" class="omen-strip"></div>
       <div id="event-card" class="event-scroll hidden"></div>
+      <div id="banner" class="banner hidden"><strong></strong><small></small></div>
+      <div id="tooltip" class="tip hidden"></div>
 
       <div class="build-whisper" id="build-whisper">Choose a blueprint below.</div>
       <div id="build-wheel" class="build-wheel"></div>
@@ -108,7 +115,8 @@
       <div class="action-dock">
         <button class="dock-button active" data-action-tab="build"><span>⚒</span><small>BUILD</small></button>
         <button class="dock-button" data-action-tab="trade"><span>⇄</span><small>TRADE</small></button>
-        <button class="dock-button" data-action-tab="tasks"><span>✦</span><small>GOALS</small></button>
+        <button class="dock-button" data-action-tab="tasks"><span>✦</span><small>PROJECTS</small></button>
+        <button class="dock-button" id="advisor-btn"><span>☼</span><small>ADVISE</small></button>
       </div>
 
       <div id="side-panel" class="side-panel hidden">
@@ -116,8 +124,7 @@
         <div id="side-content"></div>
       </div>
 
-      <button id="end-turn" class="end-turn" title="End your turn"><span>END</span><strong>TURN</strong><i>↗</i></button>
-      <button id="start-game" class="start-game hidden">BEGIN SEASON</button>
+      <button id="end-turn" class="end-turn" title="End the round"><span>END</span><strong>ROUND</strong><i>↗</i></button>
       <button id="cancel-build" class="cancel-build hidden">CANCEL</button>
 
       <div class="camera-tools">
@@ -125,8 +132,15 @@
         <button id="zoom-reset" class="hud-round">◈</button>
         <button id="zoom-in" class="hud-round">+</button>
       </div>
-      <div id="sync-status" class="sync-status">SYNCING…</div>
+      <div id="sync-status" class="sync-status">ENGINE READY</div>
       <div id="toast-root" class="toast-root"></div>
+
+      <div id="draft-modal" class="modal-backdrop hidden"><div class="wood-panel draft-box">
+        <div class="scroll-title"><span id="draft-kicker">A BLESSING FOR THE SEASON</span></div>
+        <div id="draft-cards" class="draft-cards"></div>
+      </div></div>
+
+      <div id="result-modal" class="modal-backdrop hidden"><div class="wood-panel result-box" id="result-box"></div></div>
     </section>
   </div>
   <script type="module" src="/app.js"></script>

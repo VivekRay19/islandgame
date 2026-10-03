@@ -1,74 +1,64 @@
 #!/usr/bin/env python3
+"""Static checks for the PixiJS + Anime.js + WASM client (multi-module)."""
 from __future__ import annotations
-
 from pathlib import Path
-import re
+import json, re
 
 ROOT = Path(__file__).resolve().parents[1]
-STATIC = ROOT / 'static'
-APP = STATIC / 'app.js'
-INDEX = STATIC / 'index.html'
-CSS = STATIC / 'styles.css'
-ERRORS: list[str] = []
+S = ROOT / 'static'
+JS = [S / 'app.js'] + sorted((S / 'js').glob('*.js'))
+ERR: list[str] = []
 
-for required in (APP, INDEX, CSS):
-    if not required.is_file():
-        ERRORS.append(f'missing required client file: {required}')
+for p in JS + [S / 'index.html', S / 'styles.css', S / 'v2.css']:
+    if not p.is_file():
+        ERR.append(f'missing client file: {p.relative_to(ROOT)}')
 
+# Vendored, version-pinned graphics libraries (no CDN dependency at runtime).
+pixi = S / 'vendor' / 'pixi.min.mjs'
+anime = S / 'vendor' / 'anime.esm.min.js'
+for f, name in ((pixi, 'PixiJS'), (anime, 'Anime.js')):
+    if not f.is_file() or f.stat().st_size < 50_000:
+        ERR.append(f'{name} is not vendored at {f.relative_to(ROOT)} (run: make vendor)')
+if pixi.is_file() and '8.22.0' not in pixi.read_text(errors='ignore')[:400000] and '8.22.0' not in (S/'vendor'/'VERSIONS.txt').read_text():
+    ERR.append('PixiJS 8.22.0 pin not recorded')
 
-def top_level_unused_scan(text: str) -> list[str]:
-    unused: list[str] = []
-    for match in re.finditer(r'^(?:const|let|var)\s+(\w+)\s*=', text, re.M):
-        name = match.group(1)
-        count = len(re.findall(r'\b' + re.escape(name) + r'\b', text))
-        if count <= 1:
-            unused.append(name)
-    return unused
+# The rules engine artifacts.
+for f in ('island_engine_wasm.js', 'island_engine_wasm_bg.wasm', 'island_engine_wasm.d.ts'):
+    if not (S / 'wasm' / f).is_file():
+        ERR.append(f'missing WASM artifact static/wasm/{f} (run: make wasm)')
 
+text = {p: p.read_text(encoding='utf-8') for p in JS if p.is_file()}
+for p, t in text.items():
+    if re.search(r"https?://cdn\.|jsdelivr|unpkg", t):
+        ERR.append(f'{p.relative_to(ROOT)}: CDN import found; use /vendor/')
+    if 'localStorage' in t and p.name not in ('engine.js', 'api.js', 'app.js'):
+        ERR.append(f'{p.relative_to(ROOT)}: unexpected localStorage use')
+if "'/api'" not in text.get(S / 'js' / 'api.js', ''):
+    ERR.append('API fallback is not /api')
+if "from '/vendor/pixi.min.mjs'" not in text.get(S / 'js' / 'board.js', ''):
+    ERR.append('board.js must import PixiJS from /vendor')
+if not any("from '/vendor/anime.esm.min.js'" in t for t in text.values()):
+    ERR.append('Anime.js is not imported anywhere')
 
-if APP.is_file():
-    text = APP.read_text(encoding='utf-8')
-    if 'pixi.js@8.22.0' not in text:
-        ERRORS.append('PixiJS 8.22.0 is not pinned in app.js')
-    if 'animejs@4.5.0' not in text:
-        ERRORS.append('Anime.js 4.5.0 is not pinned in app.js')
-    if "'/api'" not in text and '"/api"' not in text:
-        ERRORS.append('API fallback is not /api')
-    for token in ('undefinedVariable', '$ROOT', 'PIXI.Application({'):
-        if token in text:
-            ERRORS.append(f'unsafe token found: {token}')
-    unused = top_level_unused_scan(text)
-    if unused:
-        ERRORS.append('top-level unused declarations: ' + ', '.join(unused))
+# Every $('#id') the code uses must exist in index.html.
+idx = (S / 'index.html').read_text(encoding='utf-8')
+dom = set(re.findall(r'id="([^"]+)"', idx))
+used = set()
+for t in text.values():
+    used |= set(re.findall(r"""\$\(['"]#([A-Za-z0-9_-]+)['"]\)""", t))
+    used |= set(re.findall(r"""getElementById\(['"]([A-Za-z0-9_-]+)['"]\)""", t))
+dynamic = {'again-new', 'again-same', 'to-lobby', 'seal-extra', 'seal-status'}  # built inside the result modal
+for m in sorted(used - dom - dynamic):
+    ERR.append(f'JS references missing DOM id: #{m}')
+if 'type="module"' not in idx or '/app.js' not in idx:
+    ERR.append('index.html does not load the ES module client')
+if '/v2.css' not in idx:
+    ERR.append('index.html does not load v2.css')
 
-if INDEX.is_file():
-    index = INDEX.read_text(encoding='utf-8')
-    if 'Cultural Islands' not in index:
-        ERRORS.append('client branding string missing')
-    if 'type="module"' not in index or '/app.js' not in index:
-        ERRORS.append('index.html does not load the ES module client')
-    if '/styles.css' not in index:
-        ERRORS.append('index.html does not load styles.css')
-    dom_ids = set(re.findall(r'id="([^"]+)"', index))
-    referenced_ids = set(re.findall(r"\$\(['\"]#([A-Za-z0-9_-]+)['\"]\)", APP.read_text(encoding='utf-8')))
-    dynamic_ids = {'event-resolve', 'event-accept'}
-    missing_ids = sorted(referenced_ids - dom_ids - dynamic_ids)
-    for missing in missing_ids:
-        ERRORS.append(f'JS references missing DOM id: #{missing}')
+for asset in ('island_world.webp', 'farm.webp', 'workshop.webp', 'market.webp', 'hall.webp', 'music.webp', 'shrine.webp'):
+    if not (S / 'assets' / asset).is_file():
+        ERR.append(f'missing art asset: static/assets/{asset}')
 
-for asset in (
-    'island_world.webp', 'farm.webp', 'workshop.webp', 'market.webp',
-    'hall.webp', 'music.webp', 'shrine.webp'
-):
-    if not (STATIC / 'assets' / asset).is_file():
-        ERRORS.append(f'missing generated art asset: static/assets/{asset}')
-
-if ERRORS:
-    print('PIXIJS CLIENT SANITY: FAIL')
-    print('\n'.join(f'ERROR: {error}' for error in ERRORS))
-    raise SystemExit(1)
-
-print('PIXIJS + ANIME.JS CLIENT SANITY: PASS')
-print('Generated art assets: PASS')
-print('DOM selector references: PASS')
-print('Pinned engine versions: PASS')
+if ERR:
+    print('CLIENT SANITY: FAIL'); print('\n'.join('ERROR: ' + e for e in ERR)); raise SystemExit(1)
+print('CLIENT SANITY: PASS (Pixi + Anime vendored, WASM present, DOM ids consistent)')

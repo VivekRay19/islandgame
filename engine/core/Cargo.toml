@@ -1,0 +1,13 @@
+[package]
+name    = "island-core"
+version = "0.2.1"
+edition = "2021"
+description = "Cultural Islands rules engine. Pure, deterministic, no I/O, no clock, no OS entropy."
+
+# DELIBERATELY tiny dependency list. No rand, no uuid, no getrandom, no
+# threads, no filesystem, no clock: those are what break wasm32-unknown-unknown
+# builds. The same crate is compiled to WASM for the browser and linked natively
+# into the game server so both run IDENTICAL rules.
+[dependencies]
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"

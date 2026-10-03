@@ -1,0 +1,3 @@
+pixi.js 8.22.0 (static/vendor/pixi.min.mjs)
+animejs 4.5.0 (static/vendor/anime.esm.min.js)
+refresh with: make vendor

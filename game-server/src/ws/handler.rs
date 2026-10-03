@@ -1,18 +1,18 @@
-use actix_web::{web, HttpRequest, HttpResponse, Error};
+use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_ws::Message;
 use futures_util::StreamExt;
 use std::time::{Duration, Instant};
 
-use crate::AppState;
 use crate::ws::messages::WsMessage;
+use crate::AppState;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
-const CLIENT_TIMEOUT:     Duration = Duration::from_secs(60);
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub async fn ws_handler(
-    req:     HttpRequest,
-    stream:  web::Payload,
-    _state:  web::Data<AppState>,
+    req: HttpRequest,
+    stream: web::Payload,
+    _state: web::Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let (res, mut session, mut msg_stream) = actix_ws::handle(&req, stream)?;
     let query = req.query_string();
@@ -22,23 +22,26 @@ pub async fn ws_handler(
         let mut last_heartbeat = Instant::now();
 
         while let Some(Ok(msg)) = msg_stream.next().await {
-            if last_heartbeat.elapsed() > CLIENT_TIMEOUT { break; }
+            if last_heartbeat.elapsed() > CLIENT_TIMEOUT {
+                break;
+            }
 
             match msg {
                 Message::Text(text) => {
                     if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
                         match ws_msg {
                             WsMessage::Ping => {
-                                let _ = session.text(
-                                    serde_json::to_string(&WsMessage::Pong).unwrap()
-                                ).await;
+                                let _ = session
+                                    .text(serde_json::to_string(&WsMessage::Pong).unwrap())
+                                    .await;
                                 last_heartbeat = Instant::now();
                             }
                             WsMessage::Chat { player_id, message } => {
                                 let echo = serde_json::to_string(&WsMessage::Chat {
                                     player_id: player_id.clone(),
                                     message: message.clone(),
-                                }).unwrap();
+                                })
+                                .unwrap();
                                 let _ = session.text(echo).await;
                             }
                             _ => {
@@ -69,6 +72,10 @@ fn extract_query(qs: &str, key: &str) -> Option<String> {
         let mut kv = p.splitn(2, '=');
         let k = kv.next()?;
         let v = kv.next()?;
-        if k == key { Some(v.to_string()) } else { None }
+        if k == key {
+            Some(v.to_string())
+        } else {
+            None
+        }
     })
 }

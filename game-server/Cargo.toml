@@ -33,3 +33,4 @@ anyhow      = "1"
 dotenvy     = "0.15"
 num_cpus    = "1"
 rand        = "0.8"
+island-core = { path = "../engine/core" }

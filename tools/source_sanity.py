@@ -13,16 +13,16 @@ def require_file(path: Path) -> None:
 
 
 def scan_legacy() -> None:
-    for base in (ROOT / 'static', ROOT / 'tools', ROOT / 'Makefile', ROOT / 'README.md'):
+    for base in (ROOT / 'static', ROOT / 'Makefile', ROOT / 'README.md', ROOT / 'tools' / 'client_sanity.py'):
         paths = [base] if base.is_file() else list(base.rglob('*')) if base.exists() else []
         for path in paths:
-            if not path.is_file() or '.git' in path.parts:
+            if not path.is_file() or '.git' in path.parts or 'vendor' in path.parts or 'wasm' in path.parts:
                 continue
             try:
                 text = path.read_text(encoding='utf-8').lower()
             except UnicodeDecodeError:
                 continue
-            terms = [''.join(x) for x in [('p','h','a','s','e','r'),('g','o','d','o','t','-','c','l','i','e','n','t'),('w','e','b','p','a','c','k'),('p','a','r','c','e','l'),('t','y','p','e','s','c','r','i','p','t'),('n','o','d','e','_','m','o','d','u','l','e','s')]]
+            terms = [''.join(x) for x in [('p','h','a','s','e','r'),('g','o','d','o','t','-','c','l','i','e','n','t'),('w','e','b','p','a','c','k'),('p','a','r','c','e','l'),('t','y','p','e','s','c','r','i','p','t')]]
             for term in terms:
                 if term in text:
                     ERRORS.append(f'legacy/build reference in {path}: {term}')

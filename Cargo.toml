@@ -1,3 +1,10 @@
 [workspace]
-members  = ["game-server"]
+members  = ["engine/core", "engine/wasm", "game-server"]
 resolver = "2"
+
+# Small, fast WASM. Applies to the whole workspace; the server is unaffected
+# in any way that matters (it is I/O bound, not CPU bound).
+[profile.release]
+opt-level     = 3
+lto           = "thin"
+codegen-units = 1

@@ -1,5 +1,5 @@
-use sqlx::{postgres::PgPoolOptions, PgPool};
 use crate::config::Config;
+use sqlx::{postgres::PgPoolOptions, PgPool};
 
 pub async fn create_pool(cfg: &Config) -> PgPool {
     PgPoolOptions::new()
