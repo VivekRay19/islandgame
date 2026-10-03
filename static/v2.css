@@ -1,5 +1,5 @@
 /* v2 — HUD pieces added by the Rust/WASM engine. Same palette as styles.css. */
-.left-stack{position:absolute;left:18px;top:96px;width:262px;display:flex;flex-direction:column;gap:10px;z-index:12;pointer-events:none}
+.left-stack{position:absolute;left:18px;top:96px;width:262px;display:flex;flex-direction:column;gap:10px;z-index:20;pointer-events:none}
 .left-stack>*{pointer-events:auto}
 .left-stack .quest-ribbon{position:relative;left:auto;top:auto;width:100%}
 .goal-list{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:5px}
@@ -113,14 +113,58 @@
 .create-row input{width:100%;padding:9px 10px;border-radius:5px;border:1px solid rgba(235,208,145,.25);background:rgba(8,14,11,.7);color:#f3e9cd;margin-top:4px;text-transform:uppercase}
 .lb-row.me{color:#ffe3a3}
 
-@media(max-width:1050px){.omen-strip{top:80px;flex-wrap:wrap;justify-content:center;max-width:70vw}.left-stack{width:220px}}
+@media(max-width:1050px){
+  .omen-strip{top:80px;flex-wrap:wrap;justify-content:center;max-width:70vw}.left-stack{width:220px}
+  .left-stack .dock-button{height:54px;border-radius:10px}
+  .left-stack .dock-button span{font-size:18px}
+  .left-stack .dock-button small{font-size:6.5px}
+}
 @media(max-width:760px){
   .left-stack{top:84px;width:176px}.goal-list li{font-size:9px}.meters{padding:8px}
   .omen-strip{top:auto;bottom:196px}.build-wheel{max-width:98vw;overflow:auto}
   .tip{display:none}
+  .left-stack .action-dock{gap:4px}
+  .left-stack .dock-button{height:46px;border-radius:8px}
+  .left-stack .dock-button span{font-size:15px}
+  .left-stack .dock-button small{font-size:6px;letter-spacing:.08em}
 }
 
 /* Flat in-game background (BOARD_BG 3/3: keep in sync with BOARD_BG in js/board.js) */
 .game-scene{background:#10241e}
 .game-shade{display:none}
+
+/* Action dock placed directly beneath Actions card (wood-card meters) in left-stack */
+.left-stack .action-dock{
+  position:relative;
+  left:auto;
+  bottom:auto;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:7px;
+  width:100%;
+  margin-top:2px;
+  z-index:2;
+}
+.left-stack .dock-button{
+  width:100%;
+  height:60px;
+  border-radius:12px;
+  cursor:pointer;
+  transition:transform .15s,border-color .15s,background .15s,box-shadow .15s;
+}
+.left-stack .dock-button:hover{
+  border-color:rgba(240,197,105,.45);
+  color:#fff1c9;
+  transform:translateY(-2px);
+}
+.left-stack .dock-button.active{
+  transform:translateY(-3px);
+}
+
+.build-wheel{
+  max-width:calc(100vw - 260px);
+  overflow-x:auto;
+  overflow-y:visible;
+}
+
 
